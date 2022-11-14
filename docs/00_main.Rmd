@@ -1,0 +1,296 @@
+---
+title: Inshore fish temporal analyses 
+author: "Murray Logan"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    collapse: no
+    df_print: paged
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: textmate
+    theme: spacelab
+    toc: yes
+    toc_float: yes
+    css: resources/Rmd-html-style.css
+  pdf_document:
+    df_print: default
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: tango
+    latex_engine: xelatex
+    number_sections: yes
+    toc_depth: 2
+  word_document:
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: tango
+    toc: yes
+    toc_depth: 2
+output_dir: "docs"
+documentclass: article
+fontsize: 12pt
+mainfont: Arial
+mathfont: LiberationMono
+monofont: DejaVu Sans Mono
+classoption: a4paper
+---
+
+```{r setup, include=FALSE, warnings=FALSE, message=FALSE}
+
+assignInNamespace('.sep.label',  "^\\ *(#|--)+\\s*(@knitr|----+)(.*?)-*\\s*$", ns='knitr')
+
+tidyverse_style_with_comments_removed <- function() {
+  remove_comments <- function(pd) {
+    is_comment <- pd$token == "COMMENT"
+    pd <- pd[!is_comment,]
+    pd
+  }
+  
+  tidyverse_with_comments_removed <- styler::tidyverse_style()
+  tidyverse_with_comments_removed$token$remove_comments <- remove_comments
+  tidyverse_with_comments_removed
+}
+
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE,cache.lazy = FALSE, tidy='styler',
+                      tidy.opts=list(transformers = tidyverse_style_with_comments_removed()))
+## knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+options(tinytex.engine = 'xelatex')
+knitr::read_chunk('../scripts/00_main.R')
+knitr::read_chunk('../scripts/10_loadData.R')
+knitr::read_chunk('../scripts/20_processData.R')
+knitr::read_chunk('../scripts/31_fitModel_gbm.R')
+knitr::read_chunk('../scripts/functions.R')
+source('../scripts/functions.R')
+
+# save the built-in output hook
+hook_output <- knitr::knit_hooks$get("output")
+
+# set a new output hook to truncate text output
+knitr::knit_hooks$set(output = function(x, options) {
+  if (!is.null(n <- options$out.lines)) {
+    x <- xfun::split_lines(x)
+    if (length(x) > n) {
+      # truncate the output
+      x <- c(head(x, n), "....\n")
+    }
+    x <- paste(x, collapse = "\n")
+  }
+  hook_output(x, options)
+})
+```
+
+# Package setup
+
+```{r loadPackages, warnings=FALSE, message=FALSE, results='hide'}
+```
+
+# Data {.tabset .tabset-faded}
+
+## Import data
+
+```{r loadData, results='markdown', eval=TRUE}
+```
+
+## Glimpse data
+
+```{r glimpseData, results='markdown', eval=TRUE}
+```
+
+## Process data
+
+In the fish spatial data, there was a field called
+`Exposure.to.primary.weeks` In the current data, this field is absent,
+and in its place is a field called `Exposure.to.turbidity`.  I will
+assume that they are the same and thus alter the name of
+`Exposure.to.turbidity` to `Exposure.to.primary.weeks`
+
+As is often the case, datasets that are produced by spreadsheets have
+a tendency to include additional empty columns.  Similarly, there
+appears to be approx 100 additional empty rows at the bottom of the
+data.  We should also strip these out.
+
+```{r standardiseFieldNames, results='markdown', eval=TRUE}
+```
+
+We will create a variable lookup table that will serve numerous purposes:
+
+- map the field names to prettier labels used in tables and figures
+- provide abbreviated names for more convenient coding
+- define an appropriate modelling 'family'
+- define the type of variable ('Response' or 'Predictor')
+- define the appropriate link function associated with the 'family'
+- specify which variable (if any) to condition partial plots on
+
+```{r nameLookup, results='markdown', eval=TRUE}
+```
+
+**NOTE, in the absence of PCO1 in the input data, I have removed this
+variable from the lookup table.**
+
+```{r removePCO1, results='markdown', eval=TRUE}
+```
+
+For convenience, we will abbreviate the variable names
+```{r AbbreviatedNames, results='markdown', eval=TRUE}
+```
+
+
+## Response variables
+
+```{r responseVariables, results='markdown', eval=TRUE}
+var.lookup %>%
+    filter(Type == 'Response') %>%
+    dplyr::select('Variable' = pretty.name,
+                  everything(),
+                  -Type,
+                  -Groupby) %>%
+    kable()
+```
+
+### Exploratory data analysis{.tabset .tabset-faded}
+
+```{r functionEDA_histogram, results='markdown', eval=FALSE}
+```
+```{r functionEDA_density, results='markdown', eval=FALSE}
+```
+```{r EDA responsesprocessData, results='markdown', eval=FALSE}
+```
+```{r EDA responses, results='asis', eval=TRUE, echo = FALSE}
+load(file=paste0(DATA_PATH, 'processed/fish.eda.responses.RData'))
+
+RESPONSES <- fish.eda.responses %>% pull(Response) %>% unique()
+
+for (i in 1:length(RESPONSES)) {
+    cat(paste0("\n#### ", RESPONSES[i], " {.tabset .tabset-faded} \n"))
+    cat(paste0("![](../output/figures/eda_",RESPONSES[i],"_.png) \n\n"))
+} 
+```
+
+## Predictor variables
+
+```{r predictorVariables, results='markdown', eval=TRUE}
+var.lookup %>%
+    filter(Type == 'Predictor') %>%
+    dplyr::select('Variable' = pretty.name,
+                  everything(),
+                  -Family,
+                  -Transform,
+                  -Type,
+                  Groupby) %>%
+    kable()
+```
+
+### Exploratory data analysis{.tabset .tabset-faded}
+
+```{r functionEDA_histogram, results='markdown', eval=FALSE}
+```
+```{r functionEDA_density, results='markdown', eval=FALSE}
+```
+```{r EDA predictorsprocessData, results='markdown', eval=FALSE}
+```
+
+```{r EDA predictors, results='asis', eval=TRUE, echo = FALSE}
+load(file=paste0(DATA_PATH, 'processed/fish.eda.predictors.RData'))
+
+PREDICTORS <- fish.eda.predictors %>% pull(Predictor) %>% unique()
+
+for (i in 1:length(PREDICTORS)) {
+    cat(paste0("\n#### ", PREDICTORS[i], " {.tabset .tabset-faded} \n"))
+    cat(paste0("![](../output/figures/eda_",PREDICTORS[i],"_.png) \n\n"))
+} 
+```
+
+# Fit initial GBM's {.tabset .tabset-faded}
+
+For each response, there are four models:
+
+- all - a full model with all regions
+- Palm - a Palm model
+- Magnetic - a Magnetic model
+- Whitsunday - a Whitsunday model
+- Keppel - a Keppel model
+
+
+## Define the formulae associated with each model
+
+```{r formulas, results='markdown', eval=TRUE}
+```
+
+In addition, there is a all1 model that is a full model (all regions),
+yet does not include a Region predictor.  The reason for this is that
+within the gbm, continuous predictors that vary between regions will
+likely be dominated by the Region predictor - that is the model will
+learn regional pattern from the Region predictor (as it is a factor
+and factors tend to be 'win').  However, the purpose of the analyses
+is to explore the drivers of regional differences and therefore we are
+less interested in indicating that the regions are different than we
+are in indicating the possible drivers of these differences
+
+## Data preparation part 1
+
+- get a vector of response names
+- get a vector of predictor names
+- generate a nested tibble against Responses and Model ('all', 'all1',
+  and the regions)
+
+```{r prepareDataFit1 part 1, results='markdown', eval=FALSE}
+```
+
+## Data preparation part 2 
+
+- change the name of the `Value` to the focal `Response`
+- convert the `Field.name`s into their `Abbreviation`s
+- applying appropriate formulae according to `Response` and `Model`
+- define the groupings (which predictors conditional on which
+  categorical predictors)
+
+```{r function_change_colname_value, results='markdown', eval=FALSE}
+```
+```{r function_replace_colnames_abbrev, results='markdown', eval=FALSE}
+```
+```{r function_applyFormula, results='markdown', eval=FALSE}
+```
+```{r applyGroupings, results='markdown', eval=FALSE}
+```
+```{r prepareDataFit1 part 2, results='markdown', eval=FALSE}
+```
+
+## Fit GBM
+
+```{r function_AssignMonotone, results='markdown', eval=FALSE}
+```
+```{r function_fitGBM, results='markdown', eval=FALSE}
+```
+```{r fitGBM1, results='markdown', eval=FALSE}
+```
+
+## Relative influences {.tabset .tabset-pills}
+
+```{r function_quantile_map, results='markdown', eval=FALSE}
+```
+```{r function_rel.inf, results='markdown', eval=FALSE}
+```
+```{r Rel.infGMB1, results='markdown', eval=FALSE}
+```
+```{r function_rel.inf.plot, results='markdown', eval=FALSE}
+```
+```{r Rel.inf.PlotGMB1, results='markdown', eval=FALSE}
+```
+
+```{r relative influence plot, results='asis', eval=TRUE, echo = FALSE}
+load(file = paste0(DATA_PATH, "modelled/fish.analysis.responses.rel.inf.RData"))
+
+for (Resp in unique(fish.analysis.responses.rel.inf$Response)) {
+   Response <- var.lookup %>% filter(Abbreviation == Resp) %>% pull(pretty.name)
+   cat("\n### ", Response, " {.tabset .tabset-pills}\n") 
+   for (Model in unique(fish.analysis.responses.rel.inf$Model)){
+       cat("\n#### ", Model, "\n") 
+       cat(paste0("![](../output/figures/rel.infl_",Resp,"_",Model,".png) \n\n"))
+   }
+}   
+```
