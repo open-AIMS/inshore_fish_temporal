@@ -1,5 +1,12 @@
 *#
 *~
-.log
+*.log
 .aux
 cache/
+*.tar
+*.sif
+*.html
+*.csv
+data/
+.Rhistory
+output/
