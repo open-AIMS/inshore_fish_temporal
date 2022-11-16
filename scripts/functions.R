@@ -149,22 +149,36 @@ assignMonotone <- function(data,formula) {
 
 ## ---- function_fitGBM
 fitGBM <- function(data, form, Response, Model, var.lookup, R = 200) {
+    Response <- as.character(Response)
     MONOTONE <- assignMonotone(data, form)
     fish.sub <- data
-    if (Model %in% c('all', 'all1')) fish.sub <- data
-    else fish.sub <- data %>% filter(REGION == Model)
-    
+    if (Model %in% c('all', 'all1')) {
+        fish.sub <- data
+    } else {
+        fish.sub <- data %>% filter(REGION == Model)
+    }
     set.seed(123)
     fish.sub <- fish.sub %>% mutate_if(is.character,  as.factor)
-    family <- var.lookup %>% filter(Field.name == Response) %>%
+    family <- var.lookup %>% filter(Abbreviation == Response) %>%
         pull(Family)
-    mod <- vector('list', R)
+    mod <- vector('list', length = R)
     for (i in 1:R) {
-        print(paste0('i = ', i))
+        print(paste0('Response = ', Response, ', Model = ', Model, ', i = ', i))
         fish.sub.boot <- fish.sub %>% sample_n(n(), replace = TRUE)
+        ## if response is log transformed, make sure there are no zero values
+        if (all.vars(form, functions = TRUE)[2] == 'log') {
+            fish.sub.boot <- fish.sub.boot %>%
+                mutate(Response = !!sym(Response),
+                       Min1 = min(Response[Response > 0]),
+                       !!sym(Response) := ifelse(Response < Min1, Min1/2, Response))
+        }
         mod[[i]] <- gbm(form, data=fish.sub.boot, distribution=family,
                    cv.folds=10,interaction.depth=10,n.trees=10000, shrinkage=0.001, n.minobsinnode=2,
                    var.monotone=as.vector(MONOTONE)) 
+        if (SAVE_INDIVIDUAL_MODELS) {
+            m <- mod[[i]]
+            save(m, file = paste0(DATA_PATH, "modelled/mod_",Response,"__",Model, "___", i, ".RData"))
+        }
     }
     mod
 }
@@ -179,7 +193,9 @@ quantile_map <- map(c(0.025, 0.05, 0.25, 0.5, 0.75, 0.90, 0.975), ~ partial(quan
 rel.inf <- function(mods) {
     best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "cv")
     R <- length(mods)
-    l <- lapply(1:R, function(x) data.frame(Boot = x, summary(mods[[x]], best.iter[x])))
+    l <- lapply(1:R, function(x) data.frame(Boot = x, summary(mods[[x]],
+                                                              n.trees = best.iter[x],
+                                                              plotit = FALSE)))
     reference.infl <- 100/nrow(l[[1]])
     do.call('rbind', l) %>%
         as.data.frame() %>%

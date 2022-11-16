@@ -66,16 +66,26 @@ fish.analysis.responses <-
                       .f = ~ applyFormula(Response, Model)
                       )) %>%
     mutate(Groupings = map(.x = data,
-                           .f = ~ applyGroupings(x=.x, Response, Model))) 
+                           .f = ~ applyGroupings(x=.x, Response, Model))) %>%
+    mutate(Response = factor(Abbreviation, levels = unique(Abbreviation)))
 ## ----end
 
 ## ---- fitGBM1
+SAVE_INDIVIDUAL_MODELS <- TRUE
 fish.analysis.responses <- fish.analysis.responses %>%
     mutate(GBM = map2(.x = data, .y = Form,
-                      .f = ~ fitGBM(data = .x, form = .y, Response, Model, var.lookup, R=200)
+                      .f = ~ fitGBM(data = .x, form = .y,
+                                    Response, Model, var.lookup, R=5)
                       ))
 save(fish.analysis.responses, file=paste0(DATA_PATH, "modelled/fish.analysis.responses.RData"))
 ## ----end
+
+fish.analysis.responses %>% pull(Response) %>% unique
+a <- fish.analysis.responses %>% filter(Response == 'BE')
+data <- a[1,'data'][[1]][[1]]
+form <- a[1,'Form'][[1]][[1]]
+Model = 'all'
+Response = 'BE'
 
 ## fish.analysis.responses1[1, ]
 
@@ -99,7 +109,28 @@ fish.analysis.responses <-
 
 ## ---- Rel.inf.PlotGMB1
 fish.analysis.responses.rel.inf <-
-    fish.analysis.responses %>%
+    fish.analysis(require 'popwin)
+(popwin-mode 1)
+
+(generate-new-buffer "special-buffer")
+
+(setq eab/special-buffer-displaedp nil)
+(setq eab/special-buffer "special-buffer")
+
+(add-to-list 'popwin:special-display-config
+         `(,eab/special-buffer :width 20 :position left :stick t))    
+
+(defun eab/special-buffer-toggle ()
+  (interactive)
+  (if eab/special-buffer-displaedp
+      (progn
+      (popwin:close-popup-window)
+      (setq eab/special-buffer-displaedp nil))
+    (progn
+      (ignore-errors (popwin:display-buffer eab/special-buffer))
+      (setq eab/special-buffer-displaedp 't))))
+
+(global-set-key (kbd "<f3>") 'eab/special-buffer-toggle).responses %>%
     mutate(Rel.inf.plot = map(.x = Rel.inf,
                          .f = ~ rel.inf.plot(Rel.inf = .x, var.lookup = var.lookup)
                          )) %>%

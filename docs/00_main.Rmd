@@ -84,6 +84,27 @@ knitr::knit_hooks$set(output = function(x, options) {
 })
 ```
 
+# Overview
+
+This analysis will proceed as follows:
+
+- define formulae for six models per response
+  - `all`: all regions and predictors
+  - `all1`: all regions and all predictors other than Region (to
+    permit predictors that vary regionally to display their patterns)
+  - `Palm`: Palm region only
+  - `Magnetic`: Magnetic region only
+  - `Whitsunday`: Whitsunday region only
+  - `Keppel`: Keppel region only
+- fit initial Gradient Boosted Models (GBM's) for each response and
+  model combination and for each, determine the important predictors
+- generated temporally centred versions of the important continuous
+  predictors
+- fit models against the temporally centred predictors
+- calculate relative importance
+- calculate pseudo-Rsquared
+- produce partial plots 
+
 # Package setup
 
 ```{r loadPackages, warnings=FALSE, message=FALSE, results='hide'}
@@ -99,6 +120,13 @@ knitr::knit_hooks$set(output = function(x, options) {
 ## Glimpse data
 
 ```{r glimpseData, results='markdown', eval=TRUE}
+```
+
+## Join fish and PCA data
+
+```{r joinFishPC, results='markdown', eval=TRUE}
+```
+```{r savePrimary, results='markdown', eval=TRUE}
 ```
 
 ## Process data
@@ -129,10 +157,11 @@ We will create a variable lookup table that will serve numerous purposes:
 ```{r nameLookup, results='markdown', eval=TRUE}
 ```
 
-**NOTE, in the absence of PCO1 in the input data, I have removed this
-variable from the lookup table.**
 
-```{r removePCO1, results='markdown', eval=TRUE}
+<!-- **NOTE, in the absence of PCO1 in the input data, I have removed this -->
+<!-- variable from the lookup table.** -->
+
+```{r removePCO1, results='markdown', eval=FALSE, echo = FALSE}
 ```
 
 For convenience, we will abbreviate the variable names
@@ -151,7 +180,7 @@ var.lookup %>%
                   -Groupby) %>%
     kable()
 ```
-
+ 
 ### Exploratory data analysis{.tabset .tabset-faded}
 
 ```{r functionEDA_histogram, results='markdown', eval=FALSE}

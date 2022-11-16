@@ -66,3 +66,20 @@ make code_local
 ```{run docker docs local, engine='bash', results='markdown', eval=FALSE}
 make docs_local
 ```
+
+# Building singularity
+
+Alternatively,
+
+```{build singularity alt, engine='bash', results='markdown', eval=FALSE}
+docker save inshore_fish -o inshore_fish.tar 
+singularity build inshore_fish.sif docker-archive://inshore_fish.tar
+```
+
+# Running (executing) singularity
+
+Alternatively, from within the scripts folder
+
+```{run singularity alt, engine='bash', results='markdown', eval=FALSE}
+singularity exec -B .:/home/Project inshore_fish.sif Rscript 00_main.R
+```

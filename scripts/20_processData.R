@@ -70,6 +70,8 @@ names = names[names(names)!=names]
 ## ----end
 
 ## ---- removePCO1
+## This is no longer required
+if (1==2) {
 var.lookup <- var.lookup %>%
     filter(Field.name != 'PCO1') %>%
     droplevels()
@@ -77,6 +79,7 @@ save(var.lookup, file=paste0(DATA_PATH, "primary/var.lookup.RData"))
 names = with(var.lookup, setNames(as.character(Field.name), Abbreviation))
 ## exclude those whose names equal their values otherwise there will be duplicate fields created in the fish data
 names = names[names(names)!=names]
+}
 ## ----end
 
 
