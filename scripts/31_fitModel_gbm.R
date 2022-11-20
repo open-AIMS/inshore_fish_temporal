@@ -1,5 +1,6 @@
 source('../scripts/functions.R')
 
+SAVE_PATHS_ONLY <<- TRUE
 
 ## ---- formulas
 formulas = list(
@@ -40,7 +41,7 @@ predictors <- var.lookup %>%
     unique()
 
 fish.analysis.responses <- fish %>%
-    dplyr::select(!!!responses, !!!predictors) %>%
+    dplyr::select(!!!responses, !!!predictors, YEAR, SITE) %>%
     pivot_longer(cols = c(!!!responses),
                  names_to = "Response",
                  values_to = "Value") %>%
@@ -51,7 +52,6 @@ fish.analysis.responses <- fish %>%
               by = c('Response' = 'Field.name')) 
 
 ## ----end
-
 
 ## fish.analysis.responses[3, 'data'][[1]][[1]]
 
@@ -70,9 +70,12 @@ fish.analysis.responses <-
     mutate(Response = factor(Abbreviation, levels = unique(Abbreviation)))
 ## ----end
 
+## Ideally, it would be nice to have purrr store the result of all models,
+## However, even with just a small number of iterations, the resulting
+## object is enormous.  The compromise is to have purrr run the models and save the individual models as it goes and only return a path to the model.
 ## ---- fitGBM1
-SAVE_INDIVIDUAL_MODELS <- TRUE
-fish.analysis.responses <- fish.analysis.responses %>%
+fish.analysis.responses <-
+    fish.analysis.responses %>%
     mutate(GBM = map2(.x = data, .y = Form,
                       .f = ~ fitGBM(data = .x, form = .y,
                                     Response, Model, var.lookup, R=5)
@@ -80,27 +83,28 @@ fish.analysis.responses <- fish.analysis.responses %>%
 save(fish.analysis.responses, file=paste0(DATA_PATH, "modelled/fish.analysis.responses.RData"))
 ## ----end
 
-fish.analysis.responses %>% pull(Response) %>% unique
-a <- fish.analysis.responses %>% filter(Response == 'BE')
-data <- a[1,'data'][[1]][[1]]
-form <- a[1,'Form'][[1]][[1]]
-Model = 'all'
-Response = 'BE'
+## fish.analysis.responses %>% pull(Response) %>% unique
+## a <- fish.analysis.responses %>% filter(Response == 'BE')
+## data <- a[1,'data'][[1]][[1]]
+## form <- a[1,'Form'][[1]][[1]]
+## Model = 'all'
+## Response = 'BE'
 
 ## fish.analysis.responses1[1, ]
 
 ## fish.analysis.responses1[1, 'GBM'][[1]][[1]][[1]] %>% summary()
+## fish.analysis.responses[1, 'GBM'][[1]][[1]]
 ## fish.analysis.responses1[1, 'GBM'][[1]][[1]][[2]] %>% summary()
 
 ## ---- Rel.infGMB1
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses.RData"))
 fish.analysis.responses <-
     fish.analysis.responses %>%
     mutate(Rel.inf = map(.x = GBM,
                          .f = ~ rel.inf(mods = .x)
                          ))
+save(fish.analysis.responses, file = paste0(DATA_PATH, "modelled/fish.analysis.responses_1.RData"))
 ## ----end
-
-
 
 ## fish.analysis.responses2[1, ]
 ## fish.analysis.responses2[1, 'Rel.inf'][[1]][[1]]  
@@ -108,6 +112,7 @@ fish.analysis.responses <-
 ## Rel.inf <- fish.analysis.responses2[1, 'Rel.inf'][[1]][[1]]  
 
 ## ---- Rel.inf.PlotGMB1
+load(file = paste0(DATA_PATH, "modelled/fish.analysis.responses_1.RData"))
 fish.analysis.responses.rel.inf <-
     fish.analysis.responses %>%
     mutate(Rel.inf.plot = map(.x = Rel.inf,
@@ -124,4 +129,14 @@ map2(paste0(OUTPUT_PATH, "figures/rel.infl_",fish.analysis.responses.rel.inf$Res
      fish.analysis.responses.rel.inf$Rel.inf.plot, ggsave, width = 7, height = 5, dpi = 300)
 ## ----end
 
+## ---- Variable selection
+load(file = paste0(DATA_PATH, "modelled/fish.analysis.responses_1.RData"))
+fish.analysis.responses <-
+    fish.analysis.responses %>%
+    mutate(Variables = map(.x = Rel.inf,
+                           .f = ~ variable_selection(Rel.inf = .x)
+                           ))
+## save variable selection version of the data
+save(fish.analysis.responses, file = paste0(DATA_PATH, "modelled/fish.analysis.responses_VS.RData"))
+## ----end
 
