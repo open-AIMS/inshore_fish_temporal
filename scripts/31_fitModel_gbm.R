@@ -76,6 +76,7 @@ fish.analysis.responses <-
 ## ---- fitGBM1
 fish.analysis.responses <-
     fish.analysis.responses %>%
+    `[`(1,) %>%
     mutate(GBM = map2(.x = data, .y = Form,
                       .f = ~ fitGBM(data = .x, form = .y,
                                     Response, Model, var.lookup, R=5)

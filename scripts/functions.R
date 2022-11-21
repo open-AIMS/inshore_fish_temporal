@@ -174,8 +174,8 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
                 mutate(Response1 = !!sym(Response),
                        Response2 = replace(Response1, Response1 == 0, min(Response1[Response1>0], na.rm = TRUE)/2),
                        Response2 = ifelse(is.infinite(Response2), 0.01, Response2),
-                       !!sym(Response) := ifelse(sum(Response2)==0, 0.01, Response2)) # handle cases when all zeros
-                       ## !!sym(Response) := ifelse(Response2 < Min1, Min1/2, Response2))
+                       Response3 = sum(Response2),
+                       !!sym(Response) := ifelse(Response3 == 0, 0.01, Response2))# handle cases when all zeros
         }
         if (length(all.vars(form)) > 2) {
             mod[[i]] <- gbm(form, data=fish.sub.boot, distribution=family,
@@ -210,7 +210,7 @@ rel.inf <- function(mods) {
     if (SAVE_PATHS_ONLY) {
        mods <- lapply(mods, function(x) get(load(x))) 
     }
-    if (1==1) {  ### FIX THIS
+    if (length(mods[[1]]$var.names) > 1) {  ### more than one predictor
         best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "cv")
     } else { ## when there was only a single predictor
         best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "OOB")
