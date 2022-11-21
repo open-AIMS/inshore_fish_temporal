@@ -287,38 +287,39 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
     if (SAVE_PATHS_ONLY) {
        mods <- lapply(mods, function(x) get(load(x))) 
     }
-    if (length(all.vars(Form))>2) {  
+    ## if (length(all.vars(Form))>2) {  
+    if (length(mods[[1]]$var.names)>1) {  
         best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "cv")
     } else { ## when there was only a single predictor
         best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "OOB")
     }
-
+    DV <- all.vars(mods[[1]]$Terms)[1]
     terms <- attr(mods[[1]]$Terms, 'dataClasses')[-1]
     fit <- vector('list', length(terms)) 
     for (i in 1:length(terms)) {
         ## make newdata
-        DV <- names(terms)[i]
-        grouping <- groupings[DV]
-        DV.sym <- sym(DV)
-        otherDV <- names(terms)[-i]  ## names of predictors
-        if (!is.na(grouping)) otherDV <- otherDV[otherDV != grouping]
-        otherDV.sym <- syms(otherDV)
+        IV <- names(terms)[i]
+        grouping <- groupings[IV]
+        IV.sym <- sym(IV)
+        otherIV <- names(terms)[-i]  ## names of predictors
+        if (!is.na(grouping)) otherIV <- otherIV[otherIV != grouping]
+        otherIV.sym <- syms(otherIV)
         if (terms[i] == 'numeric') {
             newdata <- data %>%
                 ungroup() %>%
-                mutate(across(all_of(otherDV), ~ NA)) %>%
-                expand(!!DV.sym := a_seq(!!DV.sym, len), !!!otherDV.sym) 
+                mutate(across(all_of(otherIV), ~ NA)) %>%
+                expand(!!IV.sym := a_seq(!!IV.sym, len), !!!otherIV.sym) 
         } else {
             newdata <- data %>%
                 ungroup() %>%
-                mutate(across(all_of(otherDV), ~ NA)) %>%
-                expand(!!DV.sym, !!!otherDV.sym) 
+                mutate(across(all_of(otherIV), ~ NA)) %>%
+                expand(!!IV.sym, !!!otherIV.sym) 
                 
         }
         if (!is.na(grouping))
             newdata <- newdata %>%
                 ## dplyr::select(-sym(grouping)) %>%
-                crossing(data[,grouping])
+                crossing(unique(data[,grouping]))
         ## predict in lapply
         R <- length(mods)
         preds <- sapply(1:R, function(r) predict(mods[[r]],
@@ -326,21 +327,22 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
                                                  n.trees = best.iter[r]))
         colnames(preds) <- paste0('Pred',1:R)
         newdata <- newdata %>% cbind(preds) %>%
-            dplyr::select(-all_of(otherDV)) %>%
+            dplyr::select(-all_of(otherIV)) %>%
             pivot_longer(cols = matches('^Pred[0-9]+$'),
                          names_to = 'Iteration',
                          values_to = 'Pred')
         ## get centered values
 
         if (terms[i] == 'numeric') {
-            DV.mean.sym <- sym(paste0(DV, '.mean'))
+            IV.mean.sym <- sym(paste0(IV, '.mean'))
             centered_means <- data %>%
+                ungroup() %>% 
                 group_by(select(.,any_of(as.character(grouping)))) %>%
-                summarise(!!DV.mean.sym := mean(!!DV.mean.sym, na.rm = TRUE))
+                summarise(!!IV.mean.sym := mean(!!IV.mean.sym, na.rm = TRUE))
             newdata <- newdata %>%
                 full_join(centered_means) %>%
-                mutate(!!sym(paste0(DV, ".fit")) := !!DV.sym) %>%
-                mutate(!!DV.sym := !!DV.sym + !!DV.mean.sym)
+                mutate(!!sym(paste0(IV, ".fit")) := !!IV.sym) %>%
+                mutate(!!IV.sym := !!IV.sym + !!IV.mean.sym)
         }
         FUN <- all.vars(mods[[1]]$Terms, functions = TRUE)[2]
         inv.fun <- function(FUN) {
@@ -350,10 +352,79 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
         }
         newdata <-
             newdata %>% mutate(Preds = inv.fun(FUN)(Pred))
-        fit[[i]] <- newdata 
+        fit[[i]] <- newdata %>% mutate(DV = DV) 
     }
     setNames(fit, names(terms)) 
 }
 
 
+## ----end
+
+## ---- function_partial_plots
+partial_plots <- function(preds, data, var.lookup, spaghetti = FALSE) {
+    nms <- names(preds)
+    plots <- setNames(vector('list', length(nms)), nms)
+    for (i in 1:length(nms)) {
+        focal_predictor <- var.lookup %>%
+            filter(Abbreviation == nms[i])
+        IV <- nms[i]
+        IV.pretty <- focal_predictor %>% pull(pretty.name)
+        IV.type <- preds[[i]] %>% pull(!!sym(IV)) %>% class()
+        DV <- preds[[i]]$DV %>% unique() 
+        focal_response <- var.lookup %>%
+            filter(Abbreviation == DV)
+        DV.pretty <- focal_response %>% pull(pretty.name)
+        GROUP <- focal_predictor %>% pull(Groupby)
+        GROUP <- GROUP %>% str_to_upper()
+        preds[[i]] <-
+            preds[[i]] %>%
+            {if(!is.na(GROUP) & GROUP !="") mutate(., GROUP = paste(Iteration, !!sym(GROUP)))
+             else mutate(., GROUP = paste(Iteration))
+             }
+        
+        if (spaghetti & IV.type != "factor") { 
+            g <- preds[[i]] %>%
+                ggplot(aes(y = Preds, x = !!sym(IV),
+                           group = GROUP, colour = !!sym(GROUP))) +
+                geom_line(alpha = 0.5) +
+                scale_x_continuous(IV.pretty)
+        } else {
+            preds.sum <- preds[[i]] %>%
+                ungroup() %>% 
+                group_by(!!sym(IV), !!sym(GROUP)) %>%
+                summarise(across(Preds, list(!!!quantile_map), .names = "{.fn}"))
+            if (IV.type != "factor") {
+                g <- preds.sum %>%
+                    ggplot(aes(y = Median, x = !!sym(IV),
+                               colour = !!sym(GROUP), fill = !!sym(GROUP))) +
+                    geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.3, colour = NA) +
+                    geom_ribbon(aes(ymin = Lower.90, ymax = Upper.90), alpha = 0.3, colour = NA) +
+                    geom_ribbon(aes(ymin = Lower.50, ymax = Upper.50), alpha = 0.3, colour = NA) +
+                    geom_line() +
+                scale_x_continuous(IV.pretty)
+            } else {
+                if (GROUP!='') {
+                    g <- preds.sum %>%
+                        ggplot(aes(y = Median, x = !!sym(IV),
+                                   colour = !!sym(GROUP))) 
+                } else {
+                    g <- preds.sum %>%
+                    ggplot(aes(y = Median, x = !!sym(IV),
+                               colour = !!sym(IV))) 
+                }
+                g <- g + 
+                    geom_pointrange(aes(ymin = Lower, ymax = Upper), size =0.8) +
+                    geom_linerange(aes(ymin = Lower.90, ymax = Upper.90), size = 1) +
+                    geom_linerange(aes(ymin = Lower.50, ymax = Upper.50), size = 1.2) +
+                    scale_x_discrete(IV.pretty)
+            }
+            
+        }
+        plots[[nms[i]]] <- g + theme_classic() +
+            scale_y_continuous(DV.pretty) +
+            scale_colour_discrete('') +
+            scale_fill_discrete('')
+    }
+    plots
+}
 ## ----end

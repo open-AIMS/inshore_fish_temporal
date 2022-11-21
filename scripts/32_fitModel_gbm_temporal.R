@@ -51,26 +51,15 @@ save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temp
 
 
 
-partial_plots <- function(preds, data, var.lookup) {
-    nms <- names(preds)
-    
-    preds[[1]] %>%
-        filter(Iteration == 'Pred1') %>%
-        ggplot(aes(y = Preds, x = SSTMEAN, group = Iteration, colour = REGION)) +
-        geom_line(alpha = 0.5)
-    }
-
 ## partial plots
 ## ---- partial_plots
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
-fish.analysis.temporal <-
+fish.analysis.temporal.plots <-
     fish.analysis.temporal %>%
-    `[`(1,) %>%
     mutate(PartialPredictions = pmap(.l = list(x = GBM, y=data, z = Groupings),
-                                     .f = ~ partial_preds(..1,..2,..3, var.lookup, len = 10)))
-    
+                                     .f = ~ partial_preds(..1,..2,..3, var.lookup, len = 100))) %>%
     mutate(PartialPlot = map2(.x = PartialPredictions, .y = data,
-                      .f = partial_plots(.x, .y, var.lookup = var.lookup)
+                      .f = ~ partial_plots(.x, .y, var.lookup = var.lookup)
                       ))
 
 
