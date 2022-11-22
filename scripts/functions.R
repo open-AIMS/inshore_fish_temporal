@@ -257,13 +257,45 @@ variable_selection <- function(Rel.inf) {
 }
 ## ----end
 
+## ---- function_VS_check_var
+VS_check_var <- function(Variables, data) {
+    wch.numerics <- data %>%
+        group_by(SITE, across(where(is.factor))) %>%
+        pivot_longer(cols = where(is.numeric)) %>%
+        filter(name %in% Variables) %>%
+        group_by(name, .add = TRUE) %>%
+        summarise(var = var(value)) %>%
+        filter(var > 0) %>%
+        ungroup() %>%
+        dplyr::select(-SITE, -var) %>%
+        pull(name) %>% unique()
+    wch.factors <-
+        data %>%
+        dplyr::select(any_of(Variables)) %>%
+        dplyr::select(where(is.factor)) %>%
+        colnames()
+    c(wch.factors, wch.numerics)
+
+}
+## ----end
+
+## ---- function_VS_factors
+VS_factors <- function(Variables, data, Form) {
+    all_predictors <- all.vars(Form)[-1]
+    classes <- data %>% dplyr::select(any_of(all_predictors)) %>%
+        sapply(class)
+    c(Variables, names(classes)[classes %in% c("factor", "character")]) 
+    }
+## ----end
+
 ## ---- function_temporal_centering
 temporal_centering <- function(data, Variables) {
     data %>%
         group_by(SITE) %>% 
         mutate(across(!!Variables & where(is.numeric), ~ mean(.x), .names = "{col}.mean")) %>%
         mutate(across(!!Variables & where(is.numeric), ~ .x - mean(.x))) %>%
-        arrange(YEAR)
+        arrange(YEAR) %>%
+        ungroup()
 }
 ## ----end
 ## ---- function_temporal_form
@@ -286,7 +318,7 @@ a_seq <- function(x, len = 100) {
 partial_preds <- function(mods, data, groupings, var.lookup, len) {
     if (SAVE_PATHS_ONLY) {
        mods <- lapply(mods, function(x) get(load(x))) 
-    }
+    } 
     ## if (length(all.vars(Form))>2) {  
     if (length(mods[[1]]$var.names)>1) {  
         best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "cv")
@@ -300,26 +332,29 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
         ## make newdata
         IV <- names(terms)[i]
         grouping <- groupings[IV]
+        sgrouping <- as.character(str_replace_na(grouping, ''))
         IV.sym <- sym(IV)
         otherIV <- names(terms)[-i]  ## names of predictors
         if (!is.na(grouping)) otherIV <- otherIV[otherIV != grouping]
+        ## grouping <- str_replace_na(grouping, '')
         otherIV.sym <- syms(otherIV)
         if (terms[i] == 'numeric') {
             newdata <- data %>%
                 ungroup() %>%
+                group_by(!!sym(sgrouping)) %>% 
                 mutate(across(all_of(otherIV), ~ NA)) %>%
                 expand(!!IV.sym := a_seq(!!IV.sym, len), !!!otherIV.sym) 
         } else {
             newdata <- data %>%
                 ungroup() %>%
+                group_by(!!sym(sgrouping)) %>% 
                 mutate(across(all_of(otherIV), ~ NA)) %>%
                 expand(!!IV.sym, !!!otherIV.sym) 
-                
         }
-        if (!is.na(grouping))
-            newdata <- newdata %>%
-                ## dplyr::select(-sym(grouping)) %>%
-                crossing(unique(data[,grouping]))
+        ## if (!is.na(grouping))
+        ##     newdata <- newdata %>%
+        ##         ## dplyr::select(-sym(grouping)) %>%
+        ##         crossing(unique(data[,grouping]))
         ## predict in lapply
         R <- length(mods)
         preds <- sapply(1:R, function(r) predict(mods[[r]],
@@ -337,10 +372,12 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
             IV.mean.sym <- sym(paste0(IV, '.mean'))
             centered_means <- data %>%
                 ungroup() %>% 
-                group_by(select(.,any_of(as.character(grouping)))) %>%
+                group_by(select(.,any_of(as.character(str_replace_na(grouping, ''))))) %>%
                 summarise(!!IV.mean.sym := mean(!!IV.mean.sym, na.rm = TRUE))
             newdata <- newdata %>%
-                full_join(centered_means) %>%
+                {if (!is.na(grouping)) full_join(.,centered_means) %>% suppressMessages() %>% suppressWarnings()
+                 else full_join(.,centered_means, by = character()) %>% suppressMessages() %>% suppressWarnings()
+                 } %>%
                 mutate(!!sym(paste0(IV, ".fit")) := !!IV.sym) %>%
                 mutate(!!IV.sym := !!IV.sym + !!IV.mean.sym)
         }
@@ -354,14 +391,15 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
             newdata %>% mutate(Preds = inv.fun(FUN)(Pred))
         fit[[i]] <- newdata %>% mutate(DV = DV) 
     }
-    setNames(fit, names(terms)) 
+    pb$tick()
+    return(setNames(fit, names(terms))) 
 }
 
 
 ## ----end
 
 ## ---- function_partial_plots
-partial_plots <- function(preds, data, var.lookup, spaghetti = FALSE) {
+partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE) {
     nms <- names(preds)
     plots <- setNames(vector('list', length(nms)), nms)
     for (i in 1:length(nms)) {
@@ -374,8 +412,11 @@ partial_plots <- function(preds, data, var.lookup, spaghetti = FALSE) {
         focal_response <- var.lookup %>%
             filter(Abbreviation == DV)
         DV.pretty <- focal_response %>% pull(pretty.name)
-        GROUP <- focal_predictor %>% pull(Groupby)
-        GROUP <- GROUP %>% str_to_upper()
+        GROUP <- groupings[nms[i]]
+        ## GROUP <- GROUP %>% str_to_upper()
+        GROUP <- ifelse(GROUP == 'Region', 'REGION', GROUP)
+        sGROUP <- as.character(str_replace_na(GROUP,''))
+        if(sGROUP=='') nGROUP <- NULL else nGROUP <- sym(sGROUP)
         preds[[i]] <-
             preds[[i]] %>%
             {if(!is.na(GROUP) & GROUP !="") mutate(., GROUP = paste(Iteration, !!sym(GROUP)))
@@ -391,22 +432,25 @@ partial_plots <- function(preds, data, var.lookup, spaghetti = FALSE) {
         } else {
             preds.sum <- preds[[i]] %>%
                 ungroup() %>% 
-                group_by(!!sym(IV), !!sym(GROUP)) %>%
-                summarise(across(Preds, list(!!!quantile_map), .names = "{.fn}"))
+                group_by(!!sym(IV), !!sym(sGROUP)) %>%
+                summarise(across(Preds, list(!!!quantile_map), .names = "{.fn}")) %>%
+                suppressMessages() %>%
+                suppressWarnings()
             if (IV.type != "factor") {
                 g <- preds.sum %>%
                     ggplot(aes(y = Median, x = !!sym(IV),
-                               colour = !!sym(GROUP), fill = !!sym(GROUP))) +
+                               ## colour = !!sym(sGROUP), fill = !!sym(sGROUP))) +
+                               colour = !!nGROUP, fill = !!nGROUP)) +
                     geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.3, colour = NA) +
                     geom_ribbon(aes(ymin = Lower.90, ymax = Upper.90), alpha = 0.3, colour = NA) +
                     geom_ribbon(aes(ymin = Lower.50, ymax = Upper.50), alpha = 0.3, colour = NA) +
                     geom_line() +
-                scale_x_continuous(IV.pretty)
+                    scale_x_continuous(IV.pretty)
             } else {
-                if (GROUP!='') {
+                if (sGROUP!='') {
                     g <- preds.sum %>%
                         ggplot(aes(y = Median, x = !!sym(IV),
-                                   colour = !!sym(GROUP))) 
+                                   colour = !!nGROUP)) 
                 } else {
                     g <- preds.sum %>%
                     ggplot(aes(y = Median, x = !!sym(IV),
@@ -425,6 +469,7 @@ partial_plots <- function(preds, data, var.lookup, spaghetti = FALSE) {
             scale_colour_discrete('') +
             scale_fill_discrete('')
     }
+    pb$tick()
     plots
 }
 ## ----end

@@ -6,10 +6,15 @@ SAVE_PATHS_ONLY <<- TRUE
 formulas = list(
     all = ~REGION + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
     all1 = ~NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
+    all.year = ~YEAR + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
     Palm = ~ NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
+    Palm.year = ~ YEAR + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
     Magnetic = ~ NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
+    Magnetic.year = ~ YEAR + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
     Whitsunday = ~ NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
-    Keppel = ~ NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP
+    Whitsunday.year = ~ YEAR + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
+    Keppel = ~ NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP,
+    Keppel.year = ~ YEAR + NTR.Pooled + LHC + SC + MA + TURF + UC + BR + CMD + SLOPE + RUG + SCI + CHL + KD490 + SSTMEAN + SSTANOM + WAVE + DEPTH + DHW + CYCLONE + EXP
 )
 
 ## ----end
@@ -130,13 +135,21 @@ map2(paste0(OUTPUT_PATH, "figures/rel.infl_",fish.analysis.responses.rel.inf$Res
 ## ----end
 
 ## ---- Variable selection
+## Select only covaritates that:
+## - are relatively influential
+## - do vary across years
 load(file = paste0(DATA_PATH, "modelled/fish.analysis.responses_1.RData"))
 fish.analysis.responses <-
     fish.analysis.responses %>%
     mutate(Variables = map(.x = Rel.inf,
                            .f = ~ variable_selection(Rel.inf = .x)
-                           ))
+                           ),
+           Variables = map2(.x = Variables,
+                            .y = data,
+                            .f = ~ VS_check_var(.x, .y)),
+           Variables = pmap(.l = list(x = Variables, y = data, z = Form),
+                             .f = ~ VS_factors(..1, ..2, ..3))
+           )
 ## save variable selection version of the data
 save(fish.analysis.responses, file = paste0(DATA_PATH, "modelled/fish.analysis.responses_VS.RData"))
 ## ----end
-
