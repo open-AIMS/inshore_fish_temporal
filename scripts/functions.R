@@ -152,10 +152,10 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
     Response <- as.character(Response)
     MONOTONE <- assignMonotone(data, form)
     fish.sub <- data
-    if (Model %in% c('all', 'all1')) {
+    if (Model %in% c('all', 'all1', 'all.year')) {
         fish.sub <- data
     } else {
-        fish.sub <- data %>% filter(REGION == Model)
+        fish.sub <- data %>% filter(REGION == str_replace(Model,'(.*)\\..*','\\1'))
     }
     set.seed(123)
     fish.sub <- fish.sub %>% mutate_if(is.character,  as.factor)
