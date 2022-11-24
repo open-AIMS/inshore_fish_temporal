@@ -152,7 +152,8 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
     Response <- as.character(Response)
     MONOTONE <- assignMonotone(data, form)
     fish.sub <- data
-    if (Model %in% c('all', 'all1', 'all.year')) {
+    ## if (Model %in% c('all', 'all1', 'all.year', 'all.year.only')) {
+    if (str_detect(Model, "^all.*")) {
         fish.sub <- data
     } else {
         fish.sub <- data %>% filter(REGION == str_replace(Model,'(.*)\\..*','\\1'))
@@ -423,7 +424,7 @@ partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE)
              else mutate(., GROUP = paste(Iteration))
              }
         
-        if (spaghetti & IV.type != "factor") { 
+        if (spaghetti & !IV.type %in% c("factor","character")) { 
             g <- preds[[i]] %>%
                 ggplot(aes(y = Preds, x = !!sym(IV),
                            group = GROUP, colour = !!sym(GROUP))) +
@@ -436,7 +437,7 @@ partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE)
                 summarise(across(Preds, list(!!!quantile_map), .names = "{.fn}")) %>%
                 suppressMessages() %>%
                 suppressWarnings()
-            if (IV.type != "factor") {
+            if (!IV.type %in% c("factor", "character")) {
                 g <- preds.sum %>%
                     ggplot(aes(y = Median, x = !!sym(IV),
                                ## colour = !!sym(sGROUP), fill = !!sym(sGROUP))) +
@@ -457,9 +458,9 @@ partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE)
                                colour = !!sym(IV))) 
                 }
                 g <- g + 
-                    geom_pointrange(aes(ymin = Lower, ymax = Upper), size =0.8) +
-                    geom_linerange(aes(ymin = Lower.90, ymax = Upper.90), size = 1) +
-                    geom_linerange(aes(ymin = Lower.50, ymax = Upper.50), size = 1.2) +
+                    geom_pointrange(aes(ymin = Lower, ymax = Upper), size =0.8, key_glyph = "path") +
+                    geom_linerange(aes(ymin = Lower.90, ymax = Upper.90), size = 1, show.legend = FALSE) +
+                    geom_linerange(aes(ymin = Lower.50, ymax = Upper.50), size = 1.2, show.legend = FALSE) +
                     scale_x_discrete(IV.pretty)
             }
             
@@ -471,5 +472,15 @@ partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE)
     }
     pb$tick()
     plots
+}
+## ----end
+
+## ---- function_apply_consistent_y_lims
+apply_consistent_y_lims <- function(this_plot){
+    num_plots <- length(this_plot)
+    y_lims <- lapply(1:num_plots, function(x) ggplot_build(this_plot[[x]])$layout$panel_scales_y[[1]]$range$range)
+    min_y <- min(unlist(y_lims))
+    max_y <- max(unlist(y_lims))
+    lapply(this_plot, function(x) x + ylim(min_y, max_y))
 }
 ## ----end
