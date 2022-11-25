@@ -156,7 +156,7 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
     if (str_detect(Model, "^all.*")) {
         fish.sub <- data
     } else {
-        fish.sub <- data %>% filter(REGION == str_replace(Model,'(.*)\\..*','\\1'))
+        fish.sub <- data %>% filter(REGION == str_replace(Model,'([^.]*)\\..*','\\1'))
     }
     set.seed(123)
     fish.sub <- fish.sub %>% mutate_if(is.character,  as.factor)
@@ -176,7 +176,9 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
                        Response2 = replace(Response1, Response1 == 0, min(Response1[Response1>0], na.rm = TRUE)/2),
                        Response2 = ifelse(is.infinite(Response2), 0.01, Response2),
                        Response3 = sum(Response2),
-                       !!sym(Response) := ifelse(Response3 == 0, 0.01, Response2))# handle cases when all zeros
+                       !!sym(Response) := ifelse(Response3 == 0, 0.01, Response2)) %>% # handle cases when all zeros
+                suppressMessages() %>%
+                suppressWarnings()
         }
         if (length(all.vars(form)) > 2) {
             mod[[i]] <- gbm(form, data=fish.sub.boot, distribution=family,
@@ -482,5 +484,21 @@ apply_consistent_y_lims <- function(this_plot){
     min_y <- min(unlist(y_lims))
     max_y <- max(unlist(y_lims))
     lapply(this_plot, function(x) x + ylim(min_y, max_y))
+}
+## ----end
+## ---- function_partial_plot_compilations 
+partial_plot_compilations <- function(path, g, r, ncol = 3, dpi = 100) {
+     gw <- g %>% 
+         apply_consistent_y_lims() %>%
+         suppressMessages() %>%
+         suppressWarnings() %>%
+         append(list(r)) %>%
+         wrap_plots() + guide_area() + plot_layout(guides = 'collect', ncol = ncol) &
+         guides(
+             fill = "none",
+             colour = guide_legend(override.aes = list(shape = NA, size = 0.7)))
+     n_patches <- length(gw$patches$plots) + 1
+     dims <- wrap_dims(n_patches, ncol = ncol, nrow = NULL)
+     ggsave(path, gw, width = 4*dims[2], height = 3*dims[1], dpi = dpi)
 }
 ## ----end

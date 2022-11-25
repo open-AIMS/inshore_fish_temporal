@@ -10,3 +10,4 @@ cache/
 data/
 .Rhistory
 output/
+*.pdf

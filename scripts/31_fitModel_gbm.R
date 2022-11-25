@@ -86,6 +86,7 @@ fish.analysis.responses <-
 ## ---- fitGBM1
 fish.analysis.responses <-
     fish.analysis.responses %>%
+    `[`(7,) %>%
     mutate(GBM = map2(.x = data, .y = Form,
                       .f = ~ fitGBM(data = .x, form = .y,
                                     Response, Model, var.lookup, R=5)
@@ -95,12 +96,12 @@ save(fish.analysis.responses, file=paste0(DATA_PATH, "modelled/fish.analysis.res
 
 
 ## fish.analysis.responses %>% pull(Response) %>% unique
-a <- fish.analysis.responses %>% filter(Response == 'BE')
-data <- a[3,'data'][[1]][[1]]
-form <- a[3,'Form'][[1]][[1]]
-Model = 'all.year.only'
-Response = 'BE'
-R = 1
+## a <- fish.analysis.responses %>% filter(Response == 'BE')
+## data <- a[7,'data'][[1]][[1]]
+## form <- a[7,'Form'][[1]][[1]]
+## Model = 'Keppel.year.only'
+## Response = 'BE'
+## R = 1
 
 ## fish.analysis.responses1[1, ]
 

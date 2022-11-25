@@ -70,7 +70,7 @@ fish.analysis.temporal.rel.inf <-
 save(fish.analysis.temporal.rel.inf, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.rel.inf.RData"))
 ## ----end
 
-## partial plots
+## Partial plots
 ## ---- partial_predictions
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
 num_ticks <- fish.analysis.temporal %>%
@@ -110,22 +110,6 @@ save(fish.analysis.temporal.plots, file=paste0(DATA_PATH, "modelled/fish.analysi
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.plots.RData"))
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.rel.inf.RData"))
 
-partial_plot_compilations <- function(path, g, r, ncol = 3) {
-     gw <- g %>% 
-         apply_consistent_y_lims() %>%
-         suppressMessages() %>%
-         suppressWarnings() %>%
-         append(list(r)) %>%
-         wrap_plots() + guide_area() + plot_layout(guides = 'collect', ncol = ncol) &
-         guides(
-             fill = "none",
-             colour = guide_legend(override.aes = list(shape = NA, size = 0.7)))
-     n_patches <- length(gw$patches$plots) + 1
-     print(n_patches)
-     dims <- wrap_dims(n_patches, ncol = ncol, nrow = NULL)
-     print(dims)
-     ggsave(path, gw, width = 4*dims[2], height = 3*dims[1])
-}
 pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
                  fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".pdf"),
                fish.analysis.temporal.plots$PartialPlot,
@@ -133,6 +117,12 @@ pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
      .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3)
      )
 
+pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
+                 fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".png"),
+               fish.analysis.temporal.plots$PartialPlot,
+               fish.analysis.temporal.rel.inf$Rel.inf.plot),
+     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3, dpi = 75)
+     )
 ## map2(.x = paste0(OUTPUT_PATH, "figures/partial_plots_",
 ##                  fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".pdf"),
 ##      .y = fish.analysis.temporal.plots$PartialPlot,
