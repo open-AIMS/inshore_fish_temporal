@@ -43,7 +43,7 @@ fish.analysis.temporal <-
     fish.analysis.temporal %>%
     mutate(GBM = map2(.x = data, .y = Form,
                       .f = ~ fitGBM(data = .x, form = .y,
-                                    Response, Model, var.lookup, R=2,
+                                    Response, Model, var.lookup, R=100,
                                     prefix = "temporal.")
                       ))
 save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
