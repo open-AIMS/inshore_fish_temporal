@@ -64,6 +64,7 @@ knitr::read_chunk('../scripts/00_main.R')
 knitr::read_chunk('../scripts/10_loadData.R')
 knitr::read_chunk('../scripts/20_processData.R')
 knitr::read_chunk('../scripts/31_fitModel_gbm.R')
+knitr::read_chunk('../scripts/32_fitModel_gbm_temporal.R')
 knitr::read_chunk('../scripts/functions.R')
 source('../scripts/functions.R')
 
@@ -320,6 +321,100 @@ for (Resp in unique(fish.analysis.responses.rel.inf$Response)) {
    for (Model in unique(fish.analysis.responses.rel.inf$Model)){
        cat("\n#### ", Model, "\n") 
        cat(paste0("![](../output/figures/rel.infl_",Resp,"_",Model,".png) \n\n"))
+   }
+}   
+```
+
+## Variable selection
+
+For each model, pursue only covariates that:
+
+- have a median relative influence greater than the reference level
+- vary in time
+
+```{r function_variable_selection, results='markdown', eval=FALSE}
+```
+```{r function_VS_check_var, results='markdown', eval=FALSE}
+```
+```{r function_VS_factors, results='markdown', eval=FALSE}
+```
+```{r Variable selection, results='markdown', eval=FALSE}
+```
+
+# Fit temporal GBM's {.tabset .tabset-faded}
+
+## Centre covariates
+
+Most of the predictors vary across both space and time.  The focus of
+the current analyses is to explore relationships between responses and
+covariates from a temporal perspective.  In order to isolate the
+temporal trends, I will centre the covariates for each `SITE`.  Doing
+so will essentially remove the spatial component at the `SITE` level.
+The only spatial component remaining will be between `Regions`'s - and
+this is only if each `Region` has a different number of `SITE`'s.
+
+```{r function_temporal_centering, results='markdown', eval=FALSE}
+```
+```{r function_temporal_form, results='markdown', eval=FALSE}
+```
+```{r centred versions, results='markdown', eval=FALSE}
+```
+
+## Fit GBM
+
+```{r function_AssignMonotone, results='markdown', eval=FALSE}
+```
+```{r function_fitGBM, results='markdown', eval=FALSE}
+```
+```{r fitGBM1_temporal, results='markdown', eval=FALSE}
+```
+
+## Relative influences
+
+```{r function_quantile_map, results='markdown', eval=FALSE}
+```
+```{r function_rel.inf, results='markdown', eval=FALSE}
+```
+```{r fitBBM1_temporal Rel Inf, results='markdown', eval=FALSE}
+```
+
+```{r function_rel.inf.plot, results='markdown', eval=FALSE}
+```
+```{r fitGBM1_temporal Rel Inf plot, results='markdown', eval=FALSE}
+```
+
+## Partial Plots
+
+```{r function_a_seq, results='markdown', eval=FALSE}
+```
+```{r function_partial_preds, results='markdown', eval=FALSE}
+```
+```{r partial_predictions, results='markdown', eval=FALSE}
+```
+
+```{r function_partial_plots, results='markdown', eval=FALSE}
+```
+```{r partial_plots, results='markdown', eval=FALSE}
+```
+
+## Compilation partial plots {.tabset .tabset-faded}
+
+```{r function_apply_consistent_y_lims, results='markdown', eval=FALSE}
+```
+```{r function_partial_plot_compilations, results='markdown', eval=FALSE}
+```
+```{r compilation plots, results='markdown', eval=FALSE}
+```
+
+```{r compilation partial plots, results='asis', eval=TRUE, echo = FALSE}
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.rel.inf.RData"))
+
+for (Resp in unique(fish.analysis.temporal.rel.inf$Response)) {
+   Response <- var.lookup %>% filter(Abbreviation == Resp) %>% pull(pretty.name)
+   cat("\n### ", Response, " {.tabset .tabset-pills}\n") 
+   for (Model in unique(fish.analysis.temporal.rel.inf$Model)){
+       cat("\n#### ", Model, "\n") 
+       cat(paste0("![](../output/figures/partial_plots_",Resp,"_",Model,".png) \n\n"))
    }
 }   
 ```

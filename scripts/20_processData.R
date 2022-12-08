@@ -61,7 +61,8 @@ var.lookup = rbind(
     data.frame(pretty.name='Cyclone', Field.name='Cyclone', Abbreviation='CYCLONE', Family=NA, Type='Predictor', Transform='I', Groupby='Region'),
     data.frame(pretty.name='High turbidity exposure', Field.name='Exposure.to.primary.weeks', Abbreviation='EXP', Family=NA, Type='Predictor', Transform='I', Groupby='Region'),
     data.frame(pretty.name='Prey density', Field.name='Prey.density', Abbreviation='PREY.DENSITY', Family=NA, Type='Predictor', Transform='I', Groupby='Region'),
-  data.frame(pretty.name='Prey biomass', Field.name='Prey.biomass', Abbreviation='PREY.BIOMASS', Family=NA, Type='Predictor', Transform='I', Groupby='Region')
+  data.frame(pretty.name='Prey biomass', Field.name='Prey.biomass', Abbreviation='PREY.BIOMASS', Family=NA, Type='Predictor', Transform='I', Groupby='Region'),
+  data.frame(pretty.name='Year', Field.name='YEAR', Abbreviation='YEAR', Family=NA, Type='Predictor', Transform='I', Groupby='Region')
 )
 save(var.lookup, file=paste0(DATA_PATH, "primary/var.lookup.RData")) 
 names = with(var.lookup, setNames(as.character(Field.name), Abbreviation))
