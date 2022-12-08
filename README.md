@@ -83,3 +83,10 @@ Alternatively, from within the scripts folder
 ```{run singularity alt, engine='bash', results='markdown', eval=FALSE}
 singularity exec -B .:/home/Project inshore_fish.sif Rscript 00_main.R
 ```
+
+# Running (executing) on the HPC
+```{run singularity make, engine='bash', results='markdown', eval=FALSE}
+module load singularity
+singularity exec -B .:/home/Project inshore_fish.sif make -f scripts/Makefile
+singularity exec -B .:/home/Project inshore_fish.sif make -f docs/Makefile
+```
