@@ -225,6 +225,7 @@ rel.inf <- function(mods) {
     reference.infl <- 100/nrow(l[[1]])
     do.call('rbind', l) %>%
         as.data.frame() %>%
+        na.omit() %>% 
         group_by(var) %>%
         ## summarise(quants = list(quantile(rel.inf, probs = c(0.5, 0.025, 0.975)))) %>% unnest_wider(quants,)
         summarise(across(rel.inf, list(!!!quantile_map), .names = "{.fn}")) %>%

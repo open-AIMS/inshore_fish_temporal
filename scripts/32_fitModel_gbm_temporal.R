@@ -53,13 +53,17 @@ save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temp
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
 fish.analysis.temporal <-
   fish.analysis.temporal %>%
+  ## filter(Response == 'PL', Model == 'Magnetic') %>% 
   mutate(Rel.inf = map(
     .x = GBM,
-    .f = ~ rel.inf(mods = .x)
+    ## .f = ~ rel.inf(mods = .x)
+    .f = ~ {print(head(.x,1));rel.inf(mods = .x); }
   ))
+save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
 ## ----end
 
 ## ---- fitGBM1_temporal Rel Inf plot
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
 fish.analysis.temporal.rel.inf <-
   fish.analysis.temporal %>%
   mutate(Rel.inf.plot = map(
