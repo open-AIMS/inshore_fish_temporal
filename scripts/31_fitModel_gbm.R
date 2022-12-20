@@ -162,3 +162,56 @@ fish.analysis.responses <-
 ## save variable selection version of the data
 save(fish.analysis.responses, file = paste0(DATA_PATH, "modelled/fish.analysis.responses_VS.RData"))
 ## ----end
+
+## ---- initial partial_predictions
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses_1.RData"))
+num_ticks <- fish.analysis.responses %>%
+    dplyr::select(Response, Model) %>%
+    distinct() %>%
+    nrow()
+    
+pb <- progress::progress_bar$new(format = "[:bar] :current/:total (:percent) elapsed :elapsed eta :eta",
+                                 total = num_ticks)
+fish.analysis.responses.predictions <-
+    fish.analysis.responses %>%
+    mutate(PartialPredictions = pmap(.l = list(x = GBM, y=data, z = Groupings),
+                                     .f = ~ partial_preds(..1,..2,..3, var.lookup, len = 100)))
+save(fish.analysis.responses.predictions,
+     file=paste0(DATA_PATH, "modelled/fish.analysis.responses.predictions.RData"))
+## ----end
+
+## ---- initial partial_plots
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses.predictions.RData"))
+num_ticks <- fish.analysis.responses.predictions %>%
+    dplyr::select(Response, Model) %>%
+    distinct() %>%
+    nrow()
+    
+pb <- progress::progress_bar$new(format = "[:bar] :current/:total (:percent) elapsed :elapsed eta :eta",
+                                 total = num_ticks)
+fish.analysis.responses.plots <- 
+    fish.analysis.responses.predictions %>%
+    mutate(PartialPlot = pmap(.l = list(x = PartialPredictions, y = data, z = Groupings),
+                              .f = ~ partial_plots(..1, ..2, ..3, var.lookup = var.lookup)
+                              ))
+save(fish.analysis.responses.plots, file=paste0(DATA_PATH, "modelled/fish.analysis.responses.plots.RData"))
+## ----end
+
+## ---- initial compilation plots
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses.plots.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses.rel.inf.RData"))
+
+pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_initial_",
+                 fish.analysis.responses.plots$Response, "_", fish.analysis.responses.plots$Model, ".pdf"),
+               fish.analysis.responses.plots$PartialPlot,
+               fish.analysis.responses.rel.inf$Rel.inf.plot),
+     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3)
+     )
+
+pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_initial_",
+                 fish.analysis.responses.plots$Response, "_", fish.analysis.responses.plots$Model, ".png"),
+               fish.analysis.responses.plots$PartialPlot,
+               fish.analysis.responses.rel.inf$Rel.inf.plot),
+     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3, dpi = 75)
+     )
+## ----end

@@ -325,6 +325,42 @@ for (Resp in unique(fish.analysis.responses.rel.inf$Response)) {
 }   
 ```
 
+## Partial Plots
+
+```{r function_a_seq, results='markdown', eval=FALSE}
+```
+```{r function_partial_preds, results='markdown', eval=FALSE}
+```
+```{r initial partial_predictions, results='markdown', eval=FALSE}
+```
+
+```{r function_partial_plots, results='markdown', eval=FALSE}
+```
+```{r initial partial_plots, results='markdown', eval=FALSE}
+```
+
+## Compilation partial plots {.tabset .tabset-faded}
+
+```{r function_apply_consistent_y_lims, results='markdown', eval=FALSE}
+```
+```{r function_partial_plot_compilations, results='markdown', eval=FALSE}
+```
+```{r initial compilation plots, results='markdown', eval=FALSE}
+```
+
+```{r initial compilation partial plots, results='asis', eval=TRUE, echo = FALSE}
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.responses.rel.inf.RData"))
+
+for (Resp in unique(fish.analysis.responses.rel.inf$Response)) {
+   Response <- var.lookup %>% filter(Abbreviation == Resp) %>% pull(pretty.name)
+   cat("\n### ", Response, " {.tabset .tabset-pills}\n") 
+   for (Model in unique(fish.analysis.responses.rel.inf$Model)){
+       cat("\n#### ", Model, "\n") 
+       cat(paste0("![](../output/figures/partial_plots_initial_",Resp,"_",Model,".png) \n\n"))
+   }
+}   
+```
+
 ## Variable selection
 
 For each model, pursue only covariates that:

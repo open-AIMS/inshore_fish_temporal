@@ -90,3 +90,28 @@ module load singularity
 singularity exec -B .:/home/Project inshore_fish.sif make -f scripts/Makefile
 singularity exec -B .:/home/Project inshore_fish.sif make -f docs/Makefile
 ```
+
+# Running through slurm on the HPC
+
+From the project root on the HPC
+
+```{slurm, engine='text', results='markdown', eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=fish_analysis
+#SBATCH --ntasks=31
+#SBATCH --partition=cpuq
+#SBATCH --mem=200GB
+#SBATCH --output=fish_analysis_%j.log
+
+cd scripts
+module load singularity
+singularity exec -B .:/home/Project ../inshore_fish.sif Rscript 00_main.R 
+```
+
+
+```{run slurm, engine='bash', results='markdown', eval=FALSE}
+squeue -la
+squeue -o "%.18i %.9P %.8j %.8u %.8T %.10M %.8c %.4C %.9l %.6D %R"
+
+sbatch job.slurm
+```

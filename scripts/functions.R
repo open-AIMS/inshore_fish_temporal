@@ -372,7 +372,8 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
                          values_to = 'Pred')
         ## get centered values
 
-        if (terms[i] == 'numeric') {
+        if (terms[i] == 'numeric' &
+            any(names(data) %in% paste(names(terms[i]),'.mean')) ) {
             IV.mean.sym <- sym(paste0(IV, '.mean'))
             centered_means <- data %>%
                 ungroup() %>% 

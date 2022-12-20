@@ -13,10 +13,10 @@ fish.analysis.temporal <-
     fish.analysis.responses %>%
     mutate(data = map2(.x = data, .y = Variables,
                                 .f = ~ temporal_centering(data = .x, Variables = .y)
-                                ),
-           Form = map2(.x = Form, .y = Variables,
-                                .f = ~ temporal_form(form = .x, Variables = .y)
-                                ))
+                                )#,
+           ## Form = map2(.x = Form, .y = Variables,
+           ##                      .f = ~ temporal_form(form = .x, Variables = .y))
+           )
 ## ----end
 
 ## data <- fish.analysis.temporal[1,'data'][[1]][[1]]
