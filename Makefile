@@ -25,5 +25,14 @@ code_local:
 docs_local:
 	$(MAKE) -f docs/Makefile
 
+code_singularity:
+	$(MAKE) -f scripts/Makefile singularity
+
+docs_singularity:
+	@echo "Transfer to docs/Makefile"
+	module load singularity
+	singularity exec -B .:/home/Project inshore_fish.sif $(MAKE) -f docs/Makefile
+	#i$(MAKE) -f docs/Makefile singularity
+
 clean:
 	rm -f *.log *.aux *.md *.out texput.log
