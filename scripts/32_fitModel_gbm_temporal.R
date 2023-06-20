@@ -134,7 +134,7 @@ fish.analysis.temporal.R2 <-
 ## method == 1: covariates with NA and 1 - (var(P - O)/var(O))
 ## method == 2: covariates with mean values and 1 - (var(P - O)/var(O))
 ## method == 2: covariates with observed values and 1 - (var(P - O)/var(O)) then multiply by rel.inf
-R2 <- function(dat, method = 1) {
+R2 <- function(dat, method = 1, rel.inf = NULL) {
     switch(method,
            d <- dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
                                summarise(R2 = 1 - (var(Preds - Resp)/var(Resp))) %>%
@@ -145,10 +145,15 @@ R2 <- function(dat, method = 1) {
                                summarise(R2 = 1 - (var(Preds2 - Resp)/var(Resp))) %>%
                                mutate(Method = 2)
                            ) %>% suppressMessages(),
-           d <- dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
-                               summarise(R2 = 1 - (var(Preds3 - Resp)/var(Resp))) %>%
-                               mutate(Method = 3)
-                           ) %>% suppressMessages()
+           d <- dat %>%
+               map2(.y = names(dat), .f = ~ {
+                   r <- rel.inf %>% filter(var == .y) %>% pull(Median)
+                   .x %>% 
+                       group_by(Iteration, DV) %>%
+                       summarise(R2 = (1 - (var(Preds3 - Resp)/var(Resp))) * r/100) %>%
+                       mutate(Method = 3)
+                   } %>% suppressMessages()
+                   )
            )
            
     ## case_when(
@@ -176,13 +181,14 @@ R2 <- function(dat, method = 1) {
 }
 
 fish.analysis.temporal.R2 <- fish.analysis.temporal.R2 %>%
+    aa <- a %>% 
     mutate(
         R2 = map(.x = PartialFits,
                  .f = ~ R2(.x, method = 1)),
         R2.2 = map(.x = PartialFits,
                  .f = ~ R2(.x, method = 2)),
-        R2.3 = map(.x = PartialFits,
-                 .f = ~ R2(.x, method = 3)),
+        R2.3 = map2(.x = PartialFits, .y = Rel.inf,
+                 .f = ~ R2(.x, method = 3, rel.inf = .y)),
         R2tab = map(.x = R2,
                     .f = ~ .x %>%
                         map2_df(.y = names(.x), .f = ~ .x %>%
