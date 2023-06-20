@@ -54,11 +54,15 @@ load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
 fish.analysis.temporal <-
   fish.analysis.temporal %>%
   ## filter(Response == 'PL', Model == 'Magnetic') %>% 
-  mutate(Rel.inf = map(
-    .x = GBM,
-    ## .f = ~ rel.inf(mods = .x)
-    .f = ~ {print(head(.x,1));rel.inf(mods = .x); }
-  ))
+  mutate(
+      Rel.inf = map(
+          .x = GBM,
+          ## .f = ~ rel.inf(mods = .x)
+          .f = ~ {print(head(.x,1));rel.inf(mods = .x); }
+      ),
+      Rel.inf.sum = map(.x = Rel.inf,
+                        .f = ~ rel.inf.sum(l = .x))
+    )
 save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
 ## ----end
 
@@ -67,7 +71,7 @@ load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
 fish.analysis.temporal.rel.inf <-
   fish.analysis.temporal %>%
   mutate(Rel.inf.plot = map(
-    .x = Rel.inf,
+    .x = Rel.inf.sum,
     .f = ~ rel.inf.plot(Rel.inf = .x, var.lookup = var.lookup)
   )) %>%
   dplyr::select(Rel.inf, Rel.inf.plot)
@@ -108,6 +112,82 @@ fish.analysis.temporal.plots <-
                               .f = ~ partial_plots(..1, ..2, ..3, var.lookup = var.lookup)
                               ))
 save(fish.analysis.temporal.plots, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.plots.RData"))
+## ----end
+
+## ---- R2
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
+num_ticks <- fish.analysis.temporal %>%
+    dplyr::select(Response, Model) %>%
+    distinct() %>%
+    nrow()
+pb <- progress::progress_bar$new(format = "[:bar] :current/:total (:percent) elapsed :elapsed eta :eta",
+                                 total = num_ticks)
+## In the below:
+## Preds = covariates get NA values
+## Preds2 = covariates get mean values
+## Preds3 = covariates get observed values 
+fish.analysis.temporal.R2 <-
+    fish.analysis.temporal %>%
+    mutate(PartialFits = pmap(.l = list(x = GBM, y=data),
+                                     .f = ~ partial_fit(..1,..2, var.lookup)))
+
+## method == 1: covariates with NA and 1 - (var(P - O)/var(O))
+## method == 2: covariates with mean values and 1 - (var(P - O)/var(O))
+## method == 2: covariates with observed values and 1 - (var(P - O)/var(O)) then multiply by rel.inf
+R2 <- function(dat, method = 1) {
+    print(method)
+    d <- case_when(
+        method == 1 ~ {
+            print('here')
+            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                            summarise(R2 = 1 - (var(Preds - Resp)/var(Resp))) %>%
+                            mutate(Method = 1)
+                        ) %>% suppressMessages()
+        },
+        method == 2 ~ {
+            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                            summarise(R2 = 1 - (var(Preds2 - Resp)/var(Resp))) %>%
+                            mutate(Method = 2)
+                        ) %>% suppressMessages()
+            },
+        method == 3 ~ {
+            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                            summarise(R2 = 1 - (var(Preds3 - Resp)/var(Resp))) %>%
+                            mutate(Method = 3)
+                        ) %>% suppressMessages()
+            }
+    )
+    return(d)
+}
+
+fish.analysis.temporal.R2 <- fish.analysis.temporal.R2 %>%
+    mutate(
+        R2 = map(.x = PartialFits,
+                 .f = ~ R2(.x, method = 1)),
+        R2.2 = map(.x = PartialFits,
+                 .f = ~ R2(.x, method = 2)),
+        R2.3 = map(.x = PartialFits,
+                 .f = ~ R2(.x, method = 3)),
+        R2tab = map(.x = R2,
+                    .f = ~ .x %>%
+                        map2_df(.y = names(.x), .f = ~ .x %>%
+                                ungroup() %>%
+                                    summarise(across(R2, list(!!!quantile_map), .names = "{.fn}")) %>%
+                                    mutate(DV = .y))),
+        R2tab.2 = map(.x = R2.2,
+                    .f = ~ .x %>%
+                        map2_df(.y = names(.x), .f = ~ .x %>%
+                                ungroup() %>%
+                                    summarise(across(R2, list(!!!quantile_map), .names = "{.fn}")) %>%
+                                    mutate(DV = .y))),
+        R2tab.3 = map(.x = R2.3,
+                    .f = ~ .x %>%
+                        map2_df(.y = names(.x), .f = ~ .x %>%
+                                ungroup() %>%
+                                    summarise(across(R2, list(!!!quantile_map), .names = "{.fn}")) %>%
+                                    mutate(DV = .y)))
+    )
+save(fish.analysis.temporal.R2, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.R2.RData"))
 ## ----end
 
 ## ---- compilation plots

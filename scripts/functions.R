@@ -206,7 +206,7 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
 ## ---- function_quantile_map
 quantile_map <- map(c(0.025, 0.05, 0.25, 0.5, 0.75, 0.90, 0.975), ~ partial(quantile, probs = .x)) %>%
     set_names(nm = c("Lower", "Lower.90", "Lower.50", "Median", "Upper.50", "Upper.90", "Upper"))
-## ----end
+## ----end
 
 ## ---- function_rel.inf
 rel.inf <- function(mods) {
@@ -222,6 +222,12 @@ rel.inf <- function(mods) {
     l <- lapply(1:R, function(x) data.frame(Boot = x, summary(mods[[x]],
                                                               n.trees = best.iter[x],
                                                               plotit = FALSE)))
+    return(l)
+}
+## ----end
+
+## ---- function_rel.inf.sum
+rel.inf.sum <- function(l) {
     reference.infl <- 100/nrow(l[[1]])
     do.call('rbind', l) %>%
         as.data.frame() %>%
@@ -318,6 +324,98 @@ a_seq <- function(x, len = 100) {
     }
 ## ----end
 
+## ---- function_partial_fit
+partial_fit <- function(mods, data, var.lookup) {
+    if (SAVE_PATHS_ONLY) {
+        mods <- lapply(mods, function(x) get(load(x))) 
+    } 
+    if (length(mods[[1]]$var.names)>1) {  
+        best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "cv")
+    } else { ## when there was only a single predictor
+        best.iter <- sapply(mods, gbm.perf, plot.it = FALSE, method = "OOB")
+    }
+    DV <- all.vars(mods[[1]]$Terms)[1]
+    terms <- attr(mods[[1]]$Terms, 'dataClasses')[-1]
+    fit <- vector('list', length(terms)) 
+    for (i in 1:length(terms)) {
+        IV <- names(terms)[i]
+        otherIV <- names(terms)[-i]  ## names of predictors
+        ## Option 1 - Covariates get NA
+        newdata <- data %>%
+            mutate(across(all_of(otherIV), ~ NA))
+        R <- length(mods)
+        preds <- sapply(1:R, function(r) predict(mods[[r]],
+                                                 newdata = newdata,
+                                                 n.trees = best.iter[r]))
+        colnames(preds) <- paste0('Pred',1:R)
+        newdata <- newdata %>% cbind(preds) %>%
+            dplyr::select(-all_of(otherIV)) %>%
+            pivot_longer(cols = matches('^Pred[0-9]+$'),
+                         names_to = 'Iteration',
+                         values_to = 'Pred')
+        ## Option 2 - Covariates get their means
+        newdata2 <- data %>%
+            mutate(across(all_of(otherIV),  mean))
+        R <- length(mods)
+        preds2 <- sapply(1:R, function(r) predict(mods[[r]],
+                                                 newdata = newdata2,
+                                                 n.trees = best.iter[r]))
+        colnames(preds2) <- paste0('Pred',1:R)
+        newdata2 <- newdata2 %>% cbind(preds2) %>%
+            dplyr::select(-all_of(otherIV)) %>%
+            pivot_longer(cols = matches('^Pred[0-9]+$'),
+                         names_to = 'Iteration',
+                         values_to = 'Pred2')
+        ## Option 3 - Covariates set as is
+        newdata3 <- data
+        R <- length(mods)
+        preds3 <- sapply(1:R, function(r) predict(mods[[r]],
+                                                 newdata = newdata3,
+                                                 n.trees = best.iter[r]))
+        colnames(preds3) <- paste0('Pred',1:R)
+        newdata3 <- newdata3 %>% cbind(preds3) %>%
+            dplyr::select(-all_of(otherIV)) %>%
+            pivot_longer(cols = matches('^Pred[0-9]+$'),
+                         names_to = 'Iteration',
+                         values_to = 'Pred3')
+        
+        ## Now put it all together
+        newdata <- newdata %>%
+            mutate(Pred2 = newdata2$Pred2,
+                   Pred3 = newdata3$Pred3) 
+        
+        if (terms[i] == 'numeric' &
+            any(names(data) %in% paste(names(terms[i]),'.mean')) ) {
+            IV.mean.sym <- sym(paste0(IV, '.mean'))
+            centered_means <- data %>%
+                ungroup() %>% 
+                group_by(select(.,any_of(as.character(str_replace_na(grouping, ''))))) %>%
+                summarise(!!IV.mean.sym := mean(!!IV.mean.sym, na.rm = TRUE))
+            newdata <- newdata %>%
+                {if (!is.na(grouping)) full_join(.,centered_means) %>% suppressMessages() %>% suppressWarnings()
+                 else full_join(.,centered_means, by = character()) %>% suppressMessages() %>% suppressWarnings()
+                 } %>%
+                mutate(!!sym(paste0(IV, ".fit")) := !!IV.sym) %>%
+                mutate(!!IV.sym := !!IV.sym + !!IV.mean.sym)
+        }
+        FUN <- all.vars(mods[[1]]$Terms, functions = TRUE)[2]
+        inv.fun <- function(FUN) {
+            switch(FUN,
+                   "I" = I,
+                   "log" = exp)
+        }
+        newdata <-
+            newdata %>% mutate(Preds = inv.fun(FUN)(Pred)) %>%
+            mutate(Preds2 = inv.fun(FUN)(Pred2)) %>%
+            mutate(Preds3 = inv.fun(FUN)(Pred3))
+        fit[[i]] <- newdata %>% mutate(DV = DV, Resp := !! sym(DV)) 
+    }
+    
+    pb$tick()
+    return(setNames(fit, names(terms))) 
+}
+
+## ----end
 ## ---- function_partial_preds
 partial_preds <- function(mods, data, groupings, var.lookup, len) {
     if (SAVE_PATHS_ONLY) {
