@@ -135,28 +135,43 @@ fish.analysis.temporal.R2 <-
 ## method == 2: covariates with mean values and 1 - (var(P - O)/var(O))
 ## method == 2: covariates with observed values and 1 - (var(P - O)/var(O)) then multiply by rel.inf
 R2 <- function(dat, method = 1) {
-    print(method)
-    d <- case_when(
-        method == 1 ~ {
-            print('here')
-            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
-                            summarise(R2 = 1 - (var(Preds - Resp)/var(Resp))) %>%
-                            mutate(Method = 1)
-                        ) %>% suppressMessages()
-        },
-        method == 2 ~ {
-            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
-                            summarise(R2 = 1 - (var(Preds2 - Resp)/var(Resp))) %>%
-                            mutate(Method = 2)
-                        ) %>% suppressMessages()
-            },
-        method == 3 ~ {
-            dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
-                            summarise(R2 = 1 - (var(Preds3 - Resp)/var(Resp))) %>%
-                            mutate(Method = 3)
-                        ) %>% suppressMessages()
-            }
-    )
+    switch(method,
+           d <- dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                               summarise(R2 = 1 - (var(Preds - Resp)/var(Resp))) %>%
+                               mutate(Method = 1)
+                           ) %>%
+               suppressMessages(),
+           d <- dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                               summarise(R2 = 1 - (var(Preds2 - Resp)/var(Resp))) %>%
+                               mutate(Method = 2)
+                           ) %>% suppressMessages(),
+           d <- dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+                               summarise(R2 = 1 - (var(Preds3 - Resp)/var(Resp))) %>%
+                               mutate(Method = 3)
+                           ) %>% suppressMessages()
+           )
+           
+    ## case_when(
+    ##     method == 1 ~ 
+    ##         dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+    ##                         summarise(R2 = 1 - (var(Preds - Resp)/var(Resp))) %>%
+    ##                         mutate(Method = 1)
+    ##                     ) %>%
+    ##             suppressMessages()
+    ##     ,
+    ##     method == 2 ~ {
+    ##         dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+    ##                         summarise(R2 = 1 - (var(Preds2 - Resp)/var(Resp))) %>%
+    ##                         mutate(Method = 2)
+    ##                     ) %>% suppressMessages()
+    ##         },
+    ##     method == 3 ~ {
+    ##         dat %>% map(.f = ~.x %>% group_by(Iteration, DV) %>%
+    ##                         summarise(R2 = 1 - (var(Preds3 - Resp)/var(Resp))) %>%
+    ##                         mutate(Method = 3)
+    ##                     ) %>% suppressMessages()
+    ##         }
+    ## )
     return(d)
 }
 
