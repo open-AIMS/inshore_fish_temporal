@@ -206,7 +206,7 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
 ## ---- function_quantile_map
 quantile_map <- map(c(0.025, 0.05, 0.25, 0.5, 0.75, 0.90, 0.975), ~ partial(quantile, probs = .x)) %>%
     set_names(nm = c("Lower", "Lower.90", "Lower.50", "Median", "Upper.50", "Upper.90", "Upper"))
-## ----end
+## ----end
 
 ## ---- function_rel.inf
 rel.inf <- function(mods) {
