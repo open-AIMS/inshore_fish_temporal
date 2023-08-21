@@ -1,4 +1,5 @@
 source('../scripts/functions.R')
+library(furrr)
 
 SAVE_PATHS_ONLY <<- TRUE
 
@@ -18,6 +19,134 @@ fish.analysis.temporal <-
            ##                      .f = ~ temporal_form(form = .x, Variables = .y))
            )
 ## ----end
+
+
+if (Attempt == 'Old way') {
+## ---- abt models
+library(abt)
+fish.analysis.temporal.abt <-
+    fish.analysis.temporal %>%
+    ungroup() %>%
+    mutate(
+        N = 1:n(),
+        TotalN = max(N)) %>%
+    group_by(Response, Abbreviation, Model) %>%
+    mutate(
+        data = map(.x = data,
+                   .f = ~ .x %>% mutate(NTR.Pooled = factor(NTR.Pooled))
+                  ),
+        data = map2(.x = data, .y = Form,
+                    .f = ~ {
+                        ## DV <- get_response(.y)
+                        DV <- all.vars(.y)[1]
+                        .x %>% mutate(across(DV, ~replace(., .==0, min(.[.>0])/2)))
+                    }
+                    ),
+        GBM = pmap(.l = list(Form, data, Family, N, TotalN),
+                      .f = ~ {
+                          Form <- ..1
+                          data <- ..2
+                          Family <- ..3
+                          N <- ..4
+                          TotalN <- ..5
+                          print(paste0(N,"/",TotalN))
+                          
+                          mod <- abt(Form, data = data, distribution = Family, cv.folds = 100,
+                                 interaction.depth = 10, n.trees = 10000,
+                                 shrinkage = 0.001, n.minobsinnode = 2, mcores = FALSE)
+                          nm <- paste0(DATA_PATH, "modelled/abt_",N,".RData")
+                          save(mod, file=nm)
+                          nm
+                          }
+                      ))
+save(fish.analysis.temporal.abt, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.RData"))
+
+## ----end
+
+## ---- abt model stats
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.RData"))
+fish.analysis.temporal.abt.stats <-
+    fish.analysis.temporal.abt %>%
+    mutate(p = pmap(.l = list(GBM, Groupby, N, TotalN),
+                    .f = ~ {
+                        N <- ..3
+                        TotalN <- ..4
+                        print(paste0(N,"/",TotalN))
+                        mod <- get(load(file = ..1))
+                        p = plot.abts(mod, var.lookup, center = FALSE,
+                                  type = "response", return.grid = TRUE,
+                                  groupby = ..2)
+                        nm <- paste0(DATA_PATH, "modelled/abt_stats_",N,".RData")
+                        save(p, file=nm)
+                        nm
+                    }
+                    ))
+save(fish.analysis.temporal.abt.stats,
+     file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.stats.RData"))
+
+## ----end
+p <- get(load(fish.analysis.temporal.abt.stats[1,'p'][[1]][[1]]))
+
+
+## ---- abt model thresholds
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.stats.RData"))
+fish.analysis.temporal.abt.stats.thresholds <-
+    fish.analysis.temporal.abt.stats %>%
+    mutate(p = map2(.x = p,
+                    .y = N,
+                    .f = ~ {
+                        print(N)
+                        p <- get(load(file = .x))
+                        thresholds=p$thresholds
+                        ## nm <- paste0(DATA_PATH, "modelled/thresholds_",N,".RData")
+                        ## save(p, file=nm)
+                        thresholds
+                   }
+                   ))
+save(fish.analysis.temporal.abt.stats.thresholds,
+     file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.stats.thresholds.RData"))
+## ----end
+
+## ---- abt model plots
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.stats.RData"))
+fish.analysis.temporal.abt.stats.plots <-
+    fish.analysis.temporal.abt.stats %>%
+    mutate(p = pmap(.l = list(p, N, data, Model),
+                    .f = ~ {
+                        p <- ..1
+                        N <- ..2
+                        data <- ..3
+                        mod.name <- ..4
+                        print(N)
+                        p <- get(load(file = p))
+                        ps <- p[['ps']]
+                        p <- p[['p']]
+                        if ((length(levels(data$REGION))>1 ||
+                             length(levels(data$NTR.Pooled))>1) &
+                            mod.name!='all1') {
+                            p = common_legend(p)
+                            ps = common_legend(ps)
+                        }
+ 
+                        ## nm <- paste0(DATA_PATH, "modelled/thresholds_",N,".RData")
+                        ## save(p, file=nm)
+                   }
+                   ))
+save(fish.analysis.temporal.abt.stats.thresholds,
+     file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.abt.stats.thresholds.RData"))
+## ----end
+
+
+
+
+
+                                        #do.call('grid.arrange', p) ## version for the supplimentary
+ggsave(filename=paste0('output/figures/data.all.abt.',mod.name,'_',resp,'_ABT.png'), do.call('grid.arrange', p), width=15, height=10, dpi=300)
+ggsave(filename=paste0('output/figures/data.all.abt.',mod.name,'_',resp,'_ABT.pdf'), do.call('grid.arrange', p), width=15, height=10)
+
+}
+
+
 
 ## data <- fish.analysis.temporal[1,'data'][[1]][[1]]
 ## ## ## Variables <- fish.analysis.responses[1,'Variables'][[1]][[1]]
@@ -51,19 +180,30 @@ save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temp
 
 ## ---- fitBBM1_temporal Rel Inf
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
+plan(multisession, workers = 20)
 fish.analysis.temporal <-
   fish.analysis.temporal %>%
+    ungroup() %>%
+    mutate(
+        N = 1:n(),
+        TotalN = max(N)) %>%
   ## filter(Response == 'PL', Model == 'Magnetic') %>% 
   mutate(
-      Rel.inf = map(
+      Rel.inf = future_map2(
           .x = GBM,
+          .y = N,
           ## .f = ~ rel.inf(mods = .x)
-          .f = ~ {print(head(.x,1));rel.inf(mods = .x); }
+          .f = ~{
+              print(.y)
+              print(head(.x,1))
+              rel.inf(mods = .x)
+          }
       ),
       Rel.inf.sum = map(.x = Rel.inf,
                         .f = ~ rel.inf.sum(l = .x))
     )
 save(fish.analysis.temporal, file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
+## check to see the Rel.inf.sum - SSTMean should be highest
 ## ----end
 
 ## ---- fitGBM1_temporal Rel Inf plot
@@ -115,7 +255,8 @@ save(fish.analysis.temporal.plots, file=paste0(DATA_PATH, "modelled/fish.analysi
 ## ----end
 
 ## ---- R2
-load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
+## load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.RData"))
 num_ticks <- fish.analysis.temporal %>%
     dplyr::select(Response, Model) %>%
     distinct() %>%
@@ -181,13 +322,12 @@ R2 <- function(dat, method = 1, rel.inf = NULL) {
 }
 
 fish.analysis.temporal.R2 <- fish.analysis.temporal.R2 %>%
-    aa <- a %>% 
     mutate(
         R2 = map(.x = PartialFits,
                  .f = ~ R2(.x, method = 1)),
         R2.2 = map(.x = PartialFits,
                  .f = ~ R2(.x, method = 2)),
-        R2.3 = map2(.x = PartialFits, .y = Rel.inf,
+        R2.3 = map2(.x = PartialFits, .y = Rel.inf.sum,
                  .f = ~ R2(.x, method = 3, rel.inf = .y)),
         R2tab = map(.x = R2,
                     .f = ~ .x %>%
@@ -214,19 +354,25 @@ save(fish.analysis.temporal.R2, file=paste0(DATA_PATH, "modelled/fish.analysis.t
 ## ---- compilation plots
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.plots.RData"))
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.rel.inf.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.R2.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.relinf.RData"))
 
 pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
                  fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".pdf"),
                fish.analysis.temporal.plots$PartialPlot,
-               fish.analysis.temporal.rel.inf$Rel.inf.plot),
-     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3)
+               fish.analysis.temporal.rel.inf$Rel.inf.plot,
+               fish.analysis.temporal.R2$R2tab.3
+               ),
+     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, r2 = ..4, ncol = 3)
      )
 
 pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
                  fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".png"),
                fish.analysis.temporal.plots$PartialPlot,
-               fish.analysis.temporal.rel.inf$Rel.inf.plot),
-     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, ncol = 3, dpi = 75)
+               fish.analysis.temporal.rel.inf$Rel.inf.plot,
+               fish.analysis.temporal.R2$R2tab.3
+               ),
+     .f = ~ partial_plot_compilations(path=..1, g=..2, r=..3, r2 = ..4, ncol = 3, dpi = 75)
      )
 ## map2(.x = paste0(OUTPUT_PATH, "figures/partial_plots_",
 ##                  fish.analysis.temporal.plots$Response, "_", fish.analysis.temporal.plots$Model, ".pdf"),
@@ -235,6 +381,23 @@ pmap(.l = list(paste0(OUTPUT_PATH, "figures/partial_plots_",
 ##      )
 
 ## ----end
+
+## ---- R2tables
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.R2.RData"))
+fish.analysis.temporal.R2[1,'R2tab.3'][[1]][[1]]
+fish.analysis.temporal.R2.2 <- fish.analysis.temporal.R2 %>%
+    ungroup() %>%
+    mutate(R2 = map(.x = R2tab.3,
+                    .f = ~ .x %>% dplyr::select(DV, Median, Lower, Upper)
+                    )) %>%
+    dplyr::select(Response, pretty.name, Model, R2) %>%
+    unnest(R2) %>%
+    mutate(R2 = sprintf("%0.3f (%0.3f - %0.3f)", Median, Lower, Upper)) %>%
+    dplyr::select(-Median, -Lower, -Upper, -pretty.name) %>%
+    pivot_wider(id_cols = everything(), names_from = Response, values_from = R2) 
+fish.analysis.temporal.R2.2
+## ----end
+
 
 
 ## fish.analysis.temporal

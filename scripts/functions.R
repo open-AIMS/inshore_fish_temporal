@@ -586,9 +586,19 @@ apply_consistent_y_lims <- function(this_plot){
     lapply(this_plot, function(x) x + ylim(min_y, max_y))
 }
 ## ----end
+## ---- function_add_r2_values
+add_r2_values <- function(this_plot, r2value){
+    lapply(1:length(this_plot),
+           function(i) g[[i]] +
+                       annotate(geom="text", x = Inf, y = Inf,
+                                                hjust = 1, vjust = 1,
+                                                label = paste0("R2=",round(r2value$Median[[i]], 3))))
+}
+## ----end
 ## ---- function_partial_plot_compilations 
-partial_plot_compilations <- function(path, g, r, ncol = 3, dpi = 100) {
+partial_plot_compilations <- function(path, g, r, r2, ncol = 3, dpi = 100) {
      gw <- g %>% 
+         add_r2_values(r2) %>% 
          apply_consistent_y_lims() %>%
          suppressMessages() %>%
          suppressWarnings() %>%
