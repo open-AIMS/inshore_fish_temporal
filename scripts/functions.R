@@ -325,7 +325,7 @@ a_seq <- function(x, len = 100) {
 ## ----end
 
 ## ---- function_partial_fit
-partial_fit <- function(mods, data, var.lookup) {
+partial_fit <- function(mods, data, var.lookup, progress = FALSE) {
     if (SAVE_PATHS_ONLY) {
         mods <- lapply(mods, function(x) get(load(x))) 
     } 
@@ -338,6 +338,7 @@ partial_fit <- function(mods, data, var.lookup) {
     terms <- attr(mods[[1]]$Terms, 'dataClasses')[-1]
     fit <- vector('list', length(terms)) 
     for (i in 1:length(terms)) {
+        print(i)
         IV <- names(terms)[i]
         otherIV <- names(terms)[-i]  ## names of predictors
         ## Option 1 - Covariates get NA
@@ -411,13 +412,13 @@ partial_fit <- function(mods, data, var.lookup) {
         fit[[i]] <- newdata %>% mutate(DV = DV, Resp := !! sym(DV)) 
     }
     
-    pb$tick()
+    if (progress) pb$tick()
     return(setNames(fit, names(terms))) 
 }
 
 ## ----end
 ## ---- function_partial_preds
-partial_preds <- function(mods, data, groupings, var.lookup, len) {
+partial_preds <- function(mods, data, groupings, var.lookup, len, progress = TRUE) {
     if (SAVE_PATHS_ONLY) {
        mods <- lapply(mods, function(x) get(load(x))) 
     } 
@@ -494,7 +495,7 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
             newdata %>% mutate(Preds = inv.fun(FUN)(Pred))
         fit[[i]] <- newdata %>% mutate(DV = DV) 
     }
-    pb$tick()
+    if (progress) pb$tick()
     return(setNames(fit, names(terms))) 
 }
 
@@ -502,7 +503,7 @@ partial_preds <- function(mods, data, groupings, var.lookup, len) {
 ## ----end
 
 ## ---- function_partial_plots
-partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE) {
+partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE, progress = FALSE) {
     nms <- names(preds)
     plots <- setNames(vector('list', length(nms)), nms)
     for (i in 1:length(nms)) {
@@ -572,7 +573,7 @@ partial_plots <- function(preds, data, groupings, var.lookup, spaghetti = FALSE)
             scale_colour_discrete('') +
             scale_fill_discrete('')
     }
-    pb$tick()
+    if (progress) pb$tick()
     plots
 }
 ## ----end
@@ -589,26 +590,53 @@ apply_consistent_y_lims <- function(this_plot){
 ## ---- function_add_r2_values
 add_r2_values <- function(this_plot, r2value){
     lapply(1:length(this_plot),
-           function(i) g[[i]] +
-                       annotate(geom="text", x = Inf, y = Inf,
-                                                hjust = 1, vjust = 1,
-                                                label = paste0("R2=",round(r2value$Median[[i]], 3))))
+      function(i) {
+        ## this_plot[[i]] %>% str() %>% print()
+        ndat <- nrow(this_plot[[i]]$data)
+        Umax <- max(this_plot[[i]]$data[,"Upper.90"])
+        Umin <- min(this_plot[[i]]$data[,"Lower.90"])
+        Mmax <- max(this_plot[[i]]$data[,"Median"])
+        RMmax <- max(this_plot[[i]]$data[ndat,"Median"])
+        ## if the median (at the max x value) is within 10% of the max y axis
+        if ((Umax-RMmax)/(Umax-Umin) < 0.1) {
+          this_plot[[i]] +
+          annotate(geom="text", x = Inf, y = 0,
+            hjust = 1, vjust = 0,
+            label = bquote(R^{2}==.(round(r2value$Median[[i]], 3))), parse =  FALSE)
+        } else {
+          this_plot[[i]] +
+          annotate(geom="text", x = Inf, y = Inf,
+            hjust = 1, vjust = 1,
+            label = bquote(R^{2}==.(round(r2value$Median[[i]], 3))), parse =  FALSE)
+        ## label = paste0("R^{2}=",round(r2value$Median[[i]], 3)), parse =  TRUE))
+        }
+        }
+    )
 }
 ## ----end
 ## ---- function_partial_plot_compilations 
-partial_plot_compilations <- function(path, g, r, r2, ncol = 3, dpi = 100) {
-     gw <- g %>% 
+partial_plot_compilations <- function(path, g, r, r2, rel.inf, ncol = 3, dpi = 100) {
+    Vars <- rel.inf %>% filter(Flag.median) %>% pull(var)
+    r2 <- get(load(file = r2))
+    r2 <- r2 %>% filter(DV %in% Vars)
+    wch <- match(Vars,r2$DV)
+    r2 <- r2[wch,]
+    g <- get(load(file = g))
+    g <- g[Vars]
+    gw <- g %>% 
          add_r2_values(r2) %>% 
          apply_consistent_y_lims() %>%
          suppressMessages() %>%
          suppressWarnings() %>%
-         append(list(r)) %>%
-         wrap_plots() + guide_area() + plot_layout(guides = 'collect', ncol = ncol) &
-         guides(
-             fill = "none",
-             colour = guide_legend(override.aes = list(shape = NA, size = 0.7)))
-     n_patches <- length(gw$patches$plots) + 1
-     dims <- wrap_dims(n_patches, ncol = ncol, nrow = NULL)
-     ggsave(path, gw, width = 4*dims[2], height = 3*dims[1], dpi = dpi)
+         ## append(list(r)) %>%
+        wrap_plots() + wrap_elements(full=r) + #guide_area() +
+        plot_layout(guides = 'collect', ncol = ncol) &
+        theme(legend.position = 'top') &
+        guides(
+            fill = "none",
+            colour = guide_legend(override.aes = list(shape = NA, size = 0.7)))
+    n_patches <- length(gw$patches$plots) + 1
+    dims <- wrap_dims(n_patches, ncol = ncol, nrow = NULL)
+    ggsave(path, gw, width = 4*dims[2], height = 3*dims[1], dpi = dpi)
 }
 ## ----end

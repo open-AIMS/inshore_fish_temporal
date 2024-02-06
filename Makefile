@@ -30,7 +30,7 @@ code_singularity:
 
 docs_singularity:
 	@echo "Transfer to docs/Makefile"
-	module load singularity
+	#module load singularity
 	singularity exec -B .:/home/Project inshore_fish.sif $(MAKE) -f docs/Makefile
 	#i$(MAKE) -f docs/Makefile singularity
 

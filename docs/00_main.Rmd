@@ -444,13 +444,54 @@ this is only if each `Region` has a different number of `SITE`'s.
 
 ```{r compilation partial plots, results='asis', eval=TRUE, echo = FALSE}
 load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.rel.inf.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.stats.RData"))
+
+stats <- fish.analysis.temporal.stats %>%
+    dplyr::select(pretty.name, Model, Stats) %>%
+    unnest(c(Stats)) %>%
+    dplyr::select(-Flag.median)
 
 for (Resp in unique(fish.analysis.temporal.rel.inf$Response)) {
    Response <- var.lookup %>% filter(Abbreviation == Resp) %>% pull(pretty.name)
    cat("\n### ", Response, " {.tabset .tabset-pills}\n") 
    for (Model in unique(fish.analysis.temporal.rel.inf$Model)){
-       cat("\n#### ", Model, "\n") 
-       cat(paste0("![](../output/figures/partial_plots_",Resp,"_",Model,".png) \n\n"))
+       model <- Model
+       cat("\n#### ", Model, " {.tabset .tabset-pills}\n") 
+       for (R in c(1,4)) {
+           cat('\n##### R2 type ', R, '\n') 
+           cat(paste0("![](../output/figures/partial_plots_R2.", R, "_",Resp,"_",Model,".png) \n\n"))
+           RR <- ifelse(R==1, 'R2.y', 'R2.x')
+           stats %>%
+               filter(Response == Resp) %>%
+               filter(Model == model) %>%
+               dplyr::select(-Response, -pretty.name, -Model) %>%
+               dplyr::select(Covariate = DV,
+                             `Rel inf` = Rel.inf,
+                             `R-sq` = !!sym(RR),
+                             Optimum = Optimum,
+                             Threshold.high,
+                             Threshold.low) %>%
+               droplevels() %>% 
+               rmarkdown:::paged_table_html() %>% cat()
+       }
    }
 }   
+```
+ 
+## Heatmaps {.tabset .tabset-faded}
+
+```{r compilation R2, results='asis', eval=TRUE, echo = FALSE}
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.stats.RData"))
+load(file=paste0(DATA_PATH, "modelled/fish.analysis.temporal.polarity.RData"))
+stats <- fish.analysis.temporal.stats %>%
+    ## dplyr::select(Response, pretty.name, Model, Stats) %>%
+    dplyr::select(pretty.name, Model, Stats) %>%
+    unnest(c(Stats)) %>%
+    dplyr::select(-Flag.median)
+    ## pivot_longer(cols = -c(Model,DV), names_to = "Var", values_to = "Values") %>%
+    ## pivot_wider(id_cols = c(DV, Var), names_from = Model,
+for (model in unique(stats$Model)){
+    cat("\n### ", model, " {.tabset .tabset-pills}\n") 
+    cat(paste0("![](../output/figures/heatmap.",model,".png) \n\n"))
+}
 ```
