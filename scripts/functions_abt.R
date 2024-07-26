@@ -825,3 +825,73 @@ paper_figure1 <- function() {
   ggsave("test1_hires.png", gw, width = 10, height = 10*1.618, dpi = 600)
   ggsave("test1.pdf", gw, width = 10, height = 10*1.618)
 }
+
+paper_figure1_no_pomacentrids <- function() {
+  ## Total density
+  g <- fish.analysis.temporal.plots %>%
+    filter(Response == "TFDMP", Model == "all1") %>%
+    `[`(1,'PartialPlot') %>% `[[`(1) %>% `[[`(1)
+  r <- fish.analysis.temporal.plots %>% dplyr::select(Response, Model) %>%
+    bind_cols(fish.analysis.temporal.rel.inf) %>%
+    filter(Response == "TFDMP", Model == "all1") %>%
+    `[`(1,'Rel.inf.plot') %>% `[[`(1) %>% `[[`(1) +
+    ggtitle("a) Total density (#/1000m²)") +
+    theme(text = element_text(size = 16),
+          axis.title.x = element_text(margin = margin(t = 12, unit = "pt")))
+  r2 <- fish.analysis.temporal.R2 %>%
+    filter(Response == "TFDMP", Model == "all1") %>%
+    `[`(1,'R2tab.4') %>% `[[`(1) %>% `[[`(1)
+  rel.inf <- fish.analysis.temporal.R2 %>%
+    filter(Response == "TFDMP", Model == "all1") %>%
+    `[`(1,'Rel.inf.sum') %>% `[[`(1) %>% `[[`(1)
+  gw1 <- partial_plot_compilations_paper_single_figure(g, r, r2, rel.inf, ncol = 1) 
+
+  ## Species richness
+  g <- fish.analysis.temporal.plots %>%
+    filter(Response == "TFSRMP", Model == "all1") %>%
+    `[`(1,'PartialPlot') %>% `[[`(1) %>% `[[`(1)
+  r <- fish.analysis.temporal.plots %>% dplyr::select(Response, Model) %>%
+    bind_cols(fish.analysis.temporal.rel.inf) %>% 
+    filter(Response == "TFSRMP", Model == "all1") %>%
+    `[`(1,'Rel.inf.plot') %>% `[[`(1) %>% `[[`(1) +
+    ggtitle("b) Species richness") +
+    theme(text = element_text(size = 16),
+          axis.title.x = element_text(margin = margin(t = 12, unit = "pt")))
+  r2 <- fish.analysis.temporal.R2 %>%
+    filter(Response == "TFSRMP", Model == "all1") %>%
+    `[`(1,'R2tab.4') %>% `[[`(1) %>% `[[`(1)
+  rel.inf <- fish.analysis.temporal.R2 %>%
+    filter(Response == "TFSRMP", Model == "all1") %>%
+    `[`(1,'Rel.inf.sum') %>% `[[`(1) %>% `[[`(1)
+  gw2 <- partial_plot_compilations_paper_single_figure(g, r, r2, rel.inf, ncol = 1) 
+
+  ## PCO1 
+  g <- fish.analysis.temporal.plots %>%
+    filter(Response == "PCO1", Model == "all1") %>%
+    `[`(1,'PartialPlot') %>% `[[`(1) %>% `[[`(1)
+  r <- fish.analysis.temporal.plots %>% dplyr::select(Response, Model) %>%
+    bind_cols(fish.analysis.temporal.rel.inf) %>%
+    filter(Response == "PCO1", Model == "all1") %>%
+    `[`(1,'Rel.inf.plot') %>% `[[`(1) %>% `[[`(1) +
+    ggtitle("c) PCO1 (Species composition)") +
+    theme(text = element_text(size = 16),
+          axis.title.x = element_text(margin = margin(t = 12, unit = "pt")))
+  r2 <- fish.analysis.temporal.R2 %>%
+    filter(Response == "PCO1", Model == "all1") %>%
+    `[`(1,'R2tab.4') %>% `[[`(1) %>% `[[`(1)
+  rel.inf <- fish.analysis.temporal.R2 %>%
+    filter(Response == "PCO1", Model == "all1") %>%
+    `[`(1,'Rel.inf.sum') %>% `[[`(1) %>% `[[`(1)
+  gw3 <- partial_plot_compilations_paper_single_figure(g, r, r2, rel.inf, ncol = 1) 
+
+  ## gw <- (gw1 + ggtitle("a) Total density (x1000)")) +
+  ##   (gw2 + ggtile("b) Species richness")) +
+  ##   (gw3 + ggtitle("c) PCO1 (Species composition)")
+  gw <- gw1 + gw2 + gw3
+  ggsave("test_no_pomacentrids.png", gw, width = 25, height = 12)
+  gw <- gw1 / gw2 / gw3
+  ## ggsave("test1.png", gw, width = 15, height = 25)
+  ggsave("test1_no_pomacentrids.png", gw, width = 10, height = 10*1.618)
+  ggsave("test1_hires_no_pomacentrids.png", gw, width = 10, height = 10*1.618, dpi = 600)
+  ggsave("test1_no_pomacentrids.pdf", gw, width = 10, height = 10*1.618)
+}

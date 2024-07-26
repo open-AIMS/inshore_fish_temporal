@@ -179,6 +179,19 @@ fitGBM <- function(data, form, Response, Model, var.lookup, R = 200, prefix = ""
                        !!sym(Response) := ifelse(Response3 == 0, 0.01, Response2)) %>% # handle cases when all zeros
                 suppressMessages() %>%
                 suppressWarnings()
+        } else {
+            fish.sub.boot <-
+                fish.sub.boot %>%
+                filter(!is.na(!!sym(Response)),
+                       !is.infinite(!!sym(Response))) %>%
+                mutate(Response1 = !!sym(Response),
+                       Response2 = replace(Response1, Response1 == 0, min(Response1[Response1>0], na.rm = TRUE)/2),
+                       Response2 = ifelse(is.infinite(Response2), 0.01, Response2),
+                       Response3 = sum(Response2),
+                       !!sym(Response) := ifelse(Response3 == 0, 0.01, Response2)) %>% # handle cases when all zeros
+                suppressMessages() %>%
+                suppressWarnings()
+          
         }
         if (length(all.vars(form)) > 2) {
             mod[[i]] <- gbm(form, data=fish.sub.boot, distribution=family,
@@ -445,6 +458,7 @@ partial_preds <- function(mods, data, groupings, var.lookup, len, progress = TRU
             newdata <- data %>%
                 ungroup() %>%
                 group_by(!!sym(sgrouping)) %>% 
+                filter(!is.na(!!IV.sym)) %>% 
                 mutate(across(all_of(otherIV), ~ NA)) %>%
                 expand(!!IV.sym := a_seq(!!IV.sym, len), !!!otherIV.sym) 
         } else {
@@ -617,6 +631,7 @@ add_r2_values <- function(this_plot, r2value){
 ## ---- function_partial_plot_compilations 
 partial_plot_compilations <- function(path, g, r, r2, rel.inf, ncol = 3, dpi = 100) {
     Vars <- rel.inf %>% filter(Flag.median) %>% pull(var)
+
     r2 <- get(load(file = r2))
     r2 <- r2 %>% filter(DV %in% Vars)
     wch <- match(Vars,r2$DV)
